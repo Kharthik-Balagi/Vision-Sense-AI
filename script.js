@@ -182,12 +182,7 @@ async function controlVisionSense(action) {
       throw new Error(result.message || "Local controller rejected the request.");
     }
 
-    if (isStarting) {
-      startMeasurementSession(null);
-    } else {
-      stopMeasurementSession(latestLiveStatus);
-      if (latestLiveStatus) renderAutomaticMeasurement(latestLiveStatus, latestMeasurement);
-    }
+    if (isStarting) { startMeasurementSession(null); } else { stopMeasurementSession(latestLiveStatus); }
 
     systemControlStatus.innerHTML = '<span class="pulse-dot"></span> ' + (
       isStarting
@@ -398,25 +393,9 @@ let latestMeasurement = null;
 
 async function refreshLiveStatus() {
   try {
-    const status = await fetchCurrentStatus();
-    for (const { key, device } of liveRuntimeDevices) {
-      updateRuntime(device, status[`${key}_runtime`], status[key]);
-    }
-
-    latestLiveStatus = status;
-    if (measurementState.running) {
-      latestMeasurement = updateAutomaticMeasurement(status);
-    } else if (measurementState.initialized) {
-      latestMeasurement = getMeasurementSnapshot(status);
-    }
-    if (latestMeasurement) {
-      renderAutomaticMeasurement(status, latestMeasurement);
-    }
-    updateSystemConnection(status.connected);
-    updateTemperatureStatus(status);
+    const status = await fetchCurrentStatus(); latestLiveStatus = status; if (measurementState.running) { latestMeasurement = updateAutomaticMeasurement(status); } else if (measurementState.initialized) { latestMeasurement = getMeasurementSnapshot(status); } updateTemperatureStatus(status);
   } catch {
-    latestLiveStatus = null;
-    document.getElementById("system-connection-status").textContent = "WAITING FOR ARDUINO CONNECTION";
+    latestLiveStatus = null; updateTemperatureStatus({temperature_valid:false, temperature:null, cooling_allowed:false});
   } finally {
     window.setTimeout(refreshLiveStatus, 1000);
   }
