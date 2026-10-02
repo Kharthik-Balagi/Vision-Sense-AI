@@ -461,13 +461,12 @@ function saveMeasurementState() {
 function loadMeasurementState() {
   try {
     const saved = JSON.parse(localStorage.getItem(measurementStorageKey) || "null");
-    if (saved && Number.isFinite(saved.activeSeconds) && Number.isFinite(saved.inactiveSeconds)
-      && Number.isFinite(saved.lastTimestamp) && typeof saved.lastAiActive === "boolean") {
+    if (saved && Number.isFinite(saved.activeSeconds) && Number.isFinite(saved.inactiveSeconds)) {
       measurementState = {
         activeSeconds: Math.max(0, saved.activeSeconds),
         inactiveSeconds: Math.max(0, saved.inactiveSeconds),
-        lastTimestamp: saved.lastTimestamp,
-        lastAiActive: saved.lastAiActive,
+        lastTimestamp: Date.now(),
+        lastAiActive: false,
         initialized: true,
       };
     }
