@@ -125,6 +125,78 @@
       </div>
     </section>
 
+
+    <section class="energy-calculator-section" id="energy-calculator" aria-labelledby="energy-calculator-title">
+      <div class="section-shell section-pad">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow eyebrow-dark">MEASURE • SCALE • PROJECT</p>
+            <h2 id="energy-calculator-title">Energy saving <span>calculator.</span></h2>
+          </div>
+          <p class="heading-aside">Use the prototype's measured device runtime, then scale the same operating pattern to different classroom and school sizes.</p>
+        </div>
+
+        <div class="energy-calculator-grid">
+          <form class="energy-input-panel" id="energy-calculator-form">
+            <div class="calculator-panel-heading">
+              <span class="calculator-step">01</span>
+              <div><span>BASELINE & SCALE</span><h3>Enter the classroom conditions</h3></div>
+            </div>
+
+            <div class="energy-field-grid">
+              <label class="energy-field"><span>FAN POWER <small>W per fan</small></span><input id="energy-fan-watts" type="number" min="1" step="1" value="60" inputmode="decimal"></label>
+              <label class="energy-field"><span>LIGHT POWER <small>W per light</small></span><input id="energy-light-watts" type="number" min="1" step="1" value="20" inputmode="decimal"></label>
+              <label class="energy-field"><span>FANS / ZONE <small>each zone</small></span><input id="energy-fans-per-zone" type="number" min="0" step="1" value="1" inputmode="numeric"></label>
+              <label class="energy-field"><span>LIGHTS / ZONE <small>each zone</small></span><input id="energy-lights-per-zone" type="number" min="0" step="1" value="1" inputmode="numeric"></label>
+              <label class="energy-field"><span>CLASSROOM HOURS <small>per school day</small></span><input id="energy-hours" type="number" min="0.1" max="24" step="0.1" value="4" inputmode="decimal"></label>
+              <label class="energy-field"><span>SCHOOL DAYS <small>per month</small></span><input id="energy-days" type="number" min="1" max="31" step="1" value="22" inputmode="numeric"></label>
+              <label class="energy-field"><span>CLASSROOMS <small>scale factor</small></span><input id="energy-classrooms" type="number" min="1" step="1" value="1" inputmode="numeric"></label>
+              <label class="energy-field"><span>TARIFF <small>₹ per kWh</small></span><input id="energy-tariff" type="number" min="0" step="0.01" value="8" inputmode="decimal"></label>
+            </div>
+
+            <div class="energy-measured-box">
+              <div><span class="energy-box-label">SMART SYSTEM RUNTIME</span><strong id="energy-runtime-source">Waiting for measured runtime</strong></div>
+              <p>The calculator uses the latest Vision Sense AI runtime measured by the live system. Start the system and let it run for a representative period before using this result.</p>
+              <div class="energy-runtime-grid">
+                <span>ZONE 1 FAN <b id="calc-z1-fan">00:00:00</b></span>
+                <span>ZONE 1 LIGHT <b id="calc-z1-light">00:00:00</b></span>
+                <span>ZONE 2 FAN <b id="calc-z2-fan">00:00:00</b></span>
+                <span>ZONE 2 LIGHT <b id="calc-z2-light">00:00:00</b></span>
+              </div>
+            </div>
+
+            <button class="button button-primary energy-calculate-button" id="energy-calculate" type="submit">CALCULATE ENERGY IMPACT <span aria-hidden="true">→</span></button>
+            <p class="energy-validation" id="energy-validation" aria-live="polite"></p>
+          </form>
+
+          <article class="energy-results-panel" aria-live="polite">
+            <div class="calculator-panel-heading">
+              <span class="calculator-step">02</span>
+              <div><span>RESULTS</span><h3>Measured behaviour, scaled on demand</h3></div>
+            </div>
+            <div class="energy-result-highlight">
+              <span>ENERGY SAVED</span>
+              <strong id="energy-saved">—</strong>
+              <small id="energy-saved-period">Run the calculator to see the result</small>
+            </div>
+            <div class="energy-result-grid">
+              <div><span>CONVENTIONAL</span><strong id="energy-conventional">—</strong><small>kWh / day</small></div>
+              <div><span>VISION SENSE AI</span><strong id="energy-smart">—</strong><small>kWh / day</small></div>
+              <div><span>SAVING</span><strong id="energy-percent">—</strong><small>of baseline</small></div>
+              <div><span>ANNUAL ENERGY</span><strong id="energy-annual">—</strong><small>kWh saved</small></div>
+              <div><span>ANNUAL COST</span><strong id="energy-cost">—</strong><small>estimated ₹ saved</small></div>
+              <div><span>SCALE</span><strong id="energy-scale">—</strong><small>classroom(s)</small></div>
+            </div>
+            <div class="energy-method">
+              <span>CALCULATION METHOD</span>
+              <p>Conventional energy assumes all listed fans and lights operate for the full classroom schedule. Vision Sense AI energy uses the measured ON-time of each prototype device. The measured result is then scaled by classrooms and school days.</p>
+            </div>
+          </article>
+        </div>
+        <p class="energy-disclaimer">Projection note: scaled results assume the entered classrooms have the same equipment, schedule and measured usage pattern. Device wattages and electricity tariff should be replaced with the actual values used in the demonstration.</p>
+      </div>
+    </section>
+
     <section class="temperature-section" id="temperature">
       <div class="section-shell temperature-inner">
         <div class="temperature-copy"><p class="eyebrow">LIVE SENSOR DATA</p><h2>Live classroom<br><span>temperature.</span></h2><p>The DHT22 sensor sends the classroom temperature from the physical prototype. Vision Sense AI uses this reading to decide whether cooling is allowed.</p><div class="temperature-threshold"><span>COOLING THRESHOLD</span><strong>29°C</strong></div></div><article class="temperature-card">
