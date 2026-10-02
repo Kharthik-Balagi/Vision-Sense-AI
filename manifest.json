@@ -1,0 +1,19 @@
+{
+  "name": "Vision Sense AI — Smart Classroom",
+  "short_name": "Vision Sense AI",
+  "description": "Smart Classroom Energy Conservation System using zone-based occupancy detection and temperature-aware control.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#061018",
+  "theme_color": "#061018",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
