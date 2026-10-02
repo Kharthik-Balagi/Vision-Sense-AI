@@ -139,7 +139,7 @@
               <span class="calculator-step">02</span>
               <div><span class="form-step">CLASSROOM PROJECTION</span><h3>Classroom Energy Projection</h3></div>
             </div>
-            <p class="calculator-intro">Select equipment and classroom details. Smart operating time is estimated from the prototype fan and light utilization measured above.</p>
+            <p class="calculator-intro">Select equipment and classroom details. Smart fan and light operating time is projected from the measured prototype ON-time, and Vision Sense AI power is added separately to the smart energy total.</p>
 
             <div class="selection-grid">
               <section class="selection-card" aria-labelledby="fan-selection-title">
@@ -181,7 +181,7 @@
 
             <p class="form-error" id="form-error" role="alert" hidden></p>
             <button class="button button-primary calculate-button" type="submit">Calculate classroom projection <span aria-hidden="true">↗</span></button>
-            <p class="projection-note">Classroom projections are estimates based on the selected equipment ratings and smart-system utilization data.</p>
+            <p class="projection-note">Classroom projections use measured prototype ON-time over the full observation period, selected equipment ratings, school hours, and the Vision Sense AI system power.</p>
           </form>
 
           <section class="projection-results" aria-label="Classroom projection results">
@@ -195,6 +195,7 @@
             <div class="projection-result-grid smart-result-grid">
               <article class="projection-result-card"><span>Smart fan energy/day</span><strong id="smart-fan-energy">— <small>kWh/day</small></strong><small class="result-support" id="smart-fan-time">Measured fan utilization required</small></article>
               <article class="projection-result-card"><span>Smart light energy/day</span><strong id="smart-light-energy">— <small>kWh/day</small></strong><small class="result-support" id="smart-light-time">Measured light utilization required</small></article>
+              <article class="projection-result-card"><span>Vision Sense AI energy/day</span><strong id="smart-ai-energy">— <small>kWh/day</small></strong><small class="result-support" id="smart-ai-time">AI system power required</small></article>
               <article class="projection-result-card projection-result-total"><span>Total smart classroom energy/day</span><strong id="smart-daily">— <small>kWh/day</small></strong></article>
             </div>
             <div class="results-heading savings-heading"><div><span class="form-step">ESTIMATED SAVINGS</span><h3>Energy Savings Results</h3></div></div>
@@ -205,7 +206,7 @@
                 <article class="projection-result-card"><span>Estimated electricity cost saved/month</span><strong id="monthly-cost">—</strong></article>
               </div>
             </div>
-            <p class="estimate-disclaimer">Estimates compare calculated classroom projections—not measured classroom energy savings. Results depend on actual equipment, conditions, and usage.</p>
+            <p class="estimate-disclaimer">Estimates compare calculated classroom projections—not measured classroom energy savings. Smart energy includes the Vision Sense AI system power entered above.</p>
           </section>
         </div>
       </div>
