@@ -743,18 +743,21 @@ function updatePrototypeResults(measurement, fanPower, lightPower, aiPower) {
   }
 
   const observationHours = measurement.observationSeconds / 3600;
-  const measuredFanHours = (measurement.zone1FanSeconds + measurement.zone2FanSeconds) / 2 / 3600;
-  const measuredLightHours = (measurement.zone1LightSeconds + measurement.zone2LightSeconds) / 2 / 3600;
+  const measuredFanHours = (measurement.zone1FanSeconds + measurement.zone2FanSeconds) / 3600;
+  const measuredLightHours = (measurement.zone1LightSeconds + measurement.zone2LightSeconds) / 3600;
 
-  // Conventional baseline shown on the prototype card: 1 fan + 1 light
-  // running continuously for the full 7-hour school day.
-  const conventional = (fanPower + lightPower) * 7 / 1000;
+  // Fair prototype baseline: the same two-zone classroom has 2 fans and 2 lights.
+  // Conventional operation runs all four devices for the full 7-hour school day.
+  const conventionalFanEnergy = 2 * fanPower * 7 / 1000;
+  const conventionalLightEnergy = 2 * lightPower * 7 / 1000;
+  const conventional = conventionalFanEnergy + conventionalLightEnergy;
 
-  // Smart: average the two zone runtimes, then scale the measured device energy
-  // to the same 7-hour day. Add the Vision Sense AI system power for 7 hours.
-  const smartFanMeasured = measuredFanHours * fanPower;
-  const smartLightMeasured = measuredLightHours * lightPower;
-  const smartDeviceEnergy7h = (smartFanMeasured + smartLightMeasured) * (observationHours > 0 ? 7 / observationHours : 0) / 1000;
+  // Smart operation uses the measured ON-time of both physical zones, then
+  // scales that measured device energy to the same 7-hour school day.
+  const scalingFactor = observationHours > 0 ? 7 / observationHours : 0;
+  const smartFanEnergy7h = measuredFanHours * fanPower * scalingFactor / 1000;
+  const smartLightEnergy7h = measuredLightHours * lightPower * scalingFactor / 1000;
+  const smartDeviceEnergy7h = smartFanEnergy7h + smartLightEnergy7h;
   const smartAiEnergy7h = aiPower * 7 / 1000;
   const smart = smartDeviceEnergy7h + smartAiEnergy7h;
 
@@ -768,7 +771,7 @@ function updatePrototypeResults(measurement, fanPower, lightPower, aiPower) {
     ? "—"
     : `${savingPercent.toFixed(2)}% difference`;
   basisElement.textContent =
-    `7 h/day · fan/light energy from fresh session · Vision Sense AI: ${aiPower.toFixed(1)} W`;
+    `2-zone classroom · 7 h/day · measured Zone 1 + Zone 2 device runtime · Vision Sense AI: ${aiPower.toFixed(1)} W`;
 }
 
 function readRequiredNumber(name, label, options = {}) {
