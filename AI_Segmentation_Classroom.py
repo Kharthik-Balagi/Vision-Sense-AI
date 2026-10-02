@@ -310,6 +310,7 @@ zone2_fan_state = False
 status_lock = threading.Lock()
 status_server = None
 shutdown_requested = threading.Event()
+reset_runtime_on_shutdown = threading.Event()
 zone1_state = False
 zone2_state = False
 runtime_data_path = Path(__file__).resolve().with_name("runtime_data.json")
@@ -512,7 +513,7 @@ class WebsiteStatusHandler(BaseHTTPRequestHandler):
 
     def send_cors_headers(self):
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
 
     def do_OPTIONS(self):
@@ -521,7 +522,10 @@ class WebsiteStatusHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self):
-        if urlsplit(self.path).path == "/shutdown":
+        request_path = urlsplit(self.path).path
+        if request_path in ("/shutdown", "/shutdown_and_reset"):
+            if request_path == "/shutdown_and_reset":
+                reset_runtime_on_shutdown.set()
             shutdown_requested.set()
             body = b"{\"ok\":true,\"message\":\"Shutdown requested.\"}"
             self.send_response(200)
@@ -1471,6 +1475,15 @@ finally:
         zone2_light=False
     )
     save_runtime_data()
+
+    # When the website itself is closing, clear the device dashboard runtime
+    # totals so the next website session starts from 00:00:00.
+    if reset_runtime_on_shutdown.is_set():
+        with status_lock:
+            for device in runtime_totals:
+                runtime_totals[device] = 0.0
+                runtime_started_at[device] = None
+        save_runtime_data()
 
 
     # Close camera
