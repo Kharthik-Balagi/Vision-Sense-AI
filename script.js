@@ -272,6 +272,8 @@ function resetEnergyCalculatorDisplay() {
     inactiveSeconds: 0,
     lastTimestamp: 0,
     lastAiActive: false,
+    lastPersonDetected: false,
+    lastCameraOff: false,
     initialized: false,
     running: false,
     liveStarted: false,
@@ -632,6 +634,8 @@ function updateAutomaticMeasurement(status) {
     measurementState.initialized = true;
     measurementState.lastTimestamp = now;
     measurementState.lastAiActive = true;
+    measurementState.lastPersonDetected = status.zone1 === true || status.zone2 === true;
+    measurementState.lastCameraOff = false;
     measurementState.runtimeBaseline = {
       zone1_fan: Number(status.zone1_fan_runtime) || 0,
       zone2_fan: Number(status.zone2_fan_runtime) || 0,
@@ -640,12 +644,31 @@ function updateAutomaticMeasurement(status) {
     };
   } else {
     const elapsed = Math.max(0, (now - measurementState.lastTimestamp) / 1000);
-    if (measurementState.lastAiActive) {
+
+    // Measure only the two periods that belong in the energy test:
+    // 1) a person is actually detected in Zone 1 or Zone 2
+    // 2) the camera/AI is in standby after no person is detected
+    //
+    // Do not count the startup/transition period while AI is active but no
+    // person is occupying either zone. This prevents extra waiting time from
+    // inflating the observation total.
+    const personDetected = status.zone1 === true || status.zone2 === true;
+    const cameraOff = status.ai_active !== true;
+
+    if (measurementState.lastAiActive === true) {
+      // lastAiActive is retained for compatibility, but the actual active
+      // period is determined from the previous zone occupancy state below.
+    }
+
+    if (measurementState.lastPersonDetected === true) {
       measurementState.activeSeconds += elapsed;
-    } else {
+    } else if (measurementState.lastCameraOff === true) {
       measurementState.inactiveSeconds += elapsed;
     }
+
     measurementState.lastTimestamp = now;
+    measurementState.lastPersonDetected = personDetected;
+    measurementState.lastCameraOff = cameraOff;
     measurementState.lastAiActive = status.ai_active === true;
   }
 
