@@ -488,18 +488,12 @@ function startMeasurementSession(status = null) {
   measurementState = {
     activeSeconds: 0,
     inactiveSeconds: 0,
-    lastTimestamp: Date.now(),
-    lastAiActive: status?.ai_active === true,
+    lastTimestamp: 0,
+    lastAiActive: false,
     initialized: false,
     running: true,
     liveStarted: false,
     runtimeBaseline: null,
-    runtimeBaselinePending: status ? {
-      zone1_fan: Number(status.zone1_fan_runtime) || 0,
-      zone2_fan: Number(status.zone2_fan_runtime) || 0,
-      zone1_light: Number(status.zone1_light_runtime) || 0,
-      zone2_light: Number(status.zone2_light_runtime) || 0,
-    } : null,
   };
   latestMeasurement = null;
 }
@@ -514,7 +508,10 @@ function stopMeasurementSession(status = null) {
 
 function updateAutomaticMeasurement(status) {
   if (!measurementState.running) return getMeasurementSnapshot(status);
-  if (!status || status.connected !== true) return getMeasurementSnapshot(status);
+  if (!status) return getMeasurementSnapshot(status);
+
+  // The measurement clock follows the AI state, not the Arduino connection flag.
+  // Arduino may reconnect independently while the camera/AI session continues.
 
   const now = Date.now();
 
