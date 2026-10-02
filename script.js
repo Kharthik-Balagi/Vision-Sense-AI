@@ -258,8 +258,8 @@ function resetEnergyCalculatorDisplay() {
   const smartLightTime = document.getElementById("smart-light-time");
   if (smartLightTime) smartLightTime.textContent = "Projected run time: -- h/device/day";
 
-  // The fixed project contribution is intentionally unchanged:
-  // Vision Sense AI = 30 W and 0.21 kWh/day.
+  // Reset to the default 7-hour school day until a fresh calculation is made.
+  // Vision Sense AI = 30 W, so 30 × 7 / 1000 = 0.21 kWh/day.
   const smartAiEnergy = document.getElementById("smart-ai-energy");
   if (smartAiEnergy) smartAiEnergy.innerHTML = formatEnergy(0.21);
 
@@ -805,9 +805,10 @@ function updateProjectionResults(values, utilization, fanPower, lightPower, aiPo
   const smartFan = values.fans * fanPower * smartFanHours / 1000;
   const smartLight = values.lights * lightPower * smartLightHours / 1000;
 
-  // Fixed project contribution: Vision Sense AI = 30 W and 0.21 kWh/day
-  // for the defined 7-hour school day. Keep this daily contribution fixed.
-  const smartAi = 0.21;
+  // Vision Sense AI system power: 30 W.
+  // Its daily energy must follow the school operating-hours input:
+  // 30 W × hours/day ÷ 1000 = kWh/day.
+  const smartAi = aiPower * values.hours / 1000;
   const smartTotal = smartFan + smartLight + smartAi;
 
   // Keep the signed result: if the AI system's own consumption exceeds the
@@ -878,9 +879,8 @@ energyForm.addEventListener("submit", (event) => {
     return;
   }
 
-  // Fixed Vision Sense AI system power: 30 W.
-  // At the default 7-hour school day this is 30 × 7 / 1000 = 0.21 kWh/day.
-  const aiPower = 30;
+  // Vision Sense AI system power: 30 W.
+  // The calculator converts this to daily energy using the school-hours input.
 
   if (latestMeasurement.observationSeconds <= 0) {
     displayError("Wait until the live system has recorded some observation time before calculating the classroom projection.");
