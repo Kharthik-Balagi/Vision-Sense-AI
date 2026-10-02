@@ -1208,7 +1208,7 @@ function updatePrototypeResults(utilization, fanPower, lightPower) {
     `Smart energy from cumulative device runtime · Conventional energy uses total observation time`;
 }
 
-function readRequiredNumber(name, label, options = {}) {(name, label, options = {}) {
+function readRequiredNumber(name, label, options = {}) {
   const input = document.querySelector(`[name="${name}"]`);
   const value = Number(input.value);
   if (input.value.trim() === "" || !Number.isFinite(value) || value < (options.min ?? 0)) {
