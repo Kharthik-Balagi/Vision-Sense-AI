@@ -677,8 +677,9 @@ function updateProjectionResults(values, utilization, fanPower, lightPower, aiPo
   const smartFan = values.fans * fanPower * smartFanHours / 1000;
   const smartLight = values.lights * lightPower * smartLightHours / 1000;
 
-  // Vision Sense AI itself also consumes power while the classroom system runs.
-  const smartAi = aiPower * values.hours / 1000;
+  // Fixed project contribution: Vision Sense AI = 30 W and 0.21 kWh/day
+  // for the defined 7-hour school day. Keep this daily contribution fixed.
+  const smartAi = 0.21;
   const smartTotal = smartFan + smartLight + smartAi;
 
   // Keep the signed result: if the AI system's own consumption exceeds the
