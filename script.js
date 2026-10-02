@@ -183,7 +183,10 @@ async function controlVisionSense(action) {
     }
 
     if (isStarting) {
-      startMeasurementSession(latestLiveStatus);
+      startMeasurementSession(null);
+      if (latestLiveStatus?.connected === true) {
+        latestMeasurement = updateAutomaticMeasurement(latestLiveStatus);
+      }
     } else {
       stopMeasurementSession(latestLiveStatus);
       if (latestLiveStatus) renderAutomaticMeasurement(latestLiveStatus, latestMeasurement);
@@ -352,8 +355,6 @@ const measurementReadoutIds = {
   zone2Fan: "prototype-z2-fan-time",
   zone1Light: "prototype-z1-light-time",
   zone2Light: "prototype-z2-light-time",
-  fanUtilization: "prototype-fan-utilization",
-  lightUtilization: "prototype-light-utilization",
 };
 
 const rupeeFormatter = new Intl.NumberFormat("en-IN", {
@@ -446,8 +447,6 @@ function showMeasurementReadings(readings = null) {
     if (!element) continue;
     if (!readings) {
       element.textContent = key.includes("Utilization") ? "--%" : "--";
-    } else if (key.toLowerCase().includes("utilization")) {
-      element.textContent = `${(readings[key] * 100).toFixed(1)}%`;
     } else {
       element.textContent = formatRuntime(readings[key]);
     }
@@ -515,6 +514,7 @@ function stopMeasurementSession(status = null) {
 
 function updateAutomaticMeasurement(status) {
   if (!measurementState.running) return getMeasurementSnapshot(status);
+  if (!status || status.connected !== true) return getMeasurementSnapshot(status);
 
   const now = Date.now();
 
@@ -611,7 +611,6 @@ function updatePrototypeResults(measurement, fanPower, lightPower, aiPower) {
   }
 
   const observationHours = measurement.observationSeconds / 3600;
-  const activeHours = measurement.activeSeconds / 3600;
   const measuredFanHours = (measurement.zone1FanSeconds + measurement.zone2FanSeconds) / 2 / 3600;
   const measuredLightHours = (measurement.zone1LightSeconds + measurement.zone2LightSeconds) / 2 / 3600;
 
@@ -627,7 +626,7 @@ function updatePrototypeResults(measurement, fanPower, lightPower, aiPower) {
   // to the same 7-hour day. Add the Vision Sense AI system power for 7 hours.
   const smartFanMeasured = measuredFanHours * fanPower;
   const smartLightMeasured = measuredLightHours * lightPower;
-  const smartDeviceEnergy7h = (smartFanMeasured + smartLightMeasured) * (activeHours > 0 ? 7 / activeHours : 0) / 1000;
+  const smartDeviceEnergy7h = (smartFanMeasured + smartLightMeasured) * (observationHours > 0 ? 7 / observationHours : 0) / 1000;
   const smartAiEnergy7h = aiPower * 7 / 1000;
   const smart = smartDeviceEnergy7h + smartAiEnergy7h;
 
