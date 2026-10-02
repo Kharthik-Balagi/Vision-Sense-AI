@@ -213,7 +213,7 @@ async function refreshLiveStatus() {
   try {
     const status = await fetchCurrentStatus();
     for (const { key, device } of liveRuntimeDevices) {
-      updateRuntime(device, status[key], status[`${key}_runtime`]);
+      updateRuntime(device, status[`${key}_runtime`], status[key]);
     }
 
     latestLiveStatus = status;
