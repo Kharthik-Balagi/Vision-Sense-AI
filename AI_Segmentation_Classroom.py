@@ -647,6 +647,10 @@ try:
 
     while True:
 
+        # Cooperative shutdown must be checked before either AI or standby work.
+        # This guarantees STOP can release the camera even while YOLO is active.
+        if shutdown_requested.is_set():
+            break
 
         # =================================================
         # AI MODE
