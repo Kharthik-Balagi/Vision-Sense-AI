@@ -328,12 +328,11 @@ async function fetchCurrentStatus() {
 
 const energyForm = document.querySelector("#energy-form");
 const formError = document.querySelector("#form-error");
-const measurementStatus = document.querySelector("#measurement-status");
 const liveMeasurementSummary = document.querySelector("#prototype-measured-basis");
-const startMeasurementButton = document.querySelector("#start-measurement");
-const stopMeasurementButton = document.querySelector("#stop-measurement");
 const measurementReadoutIds = {
-  duration: "prototype-duration",
+  active: "prototype-active-time",
+  inactive: "prototype-camera-off-time",
+  observation: "prototype-observation-time",
   zone1Fan: "prototype-z1-fan-time",
   zone2Fan: "prototype-z2-fan-time",
   zone1Light: "prototype-z1-light-time",
@@ -360,25 +359,24 @@ const lightOptions = {
   incandescent: { watts: 80, range: "Typical range: 60–100 W · calculation value: 80 W" },
 };
 
-let activeMeasurement = null;
-let completedMeasurement = null;
-
-function formatEnergy(value, unit = "kWh/day") {
-  return `${value.toFixed(3)} <small>${unit}</small>`;
+function formatEnergy(value, unit = "kWh") {
+  if (!Number.isFinite(value)) return `-- <small>${unit}</small>`;
+  const decimals = Math.abs(value) < 0.001 && value !== 0 ? 6 : 3;
+  return `${value.toFixed(decimals)} <small>${unit}</small>`;
 }
 
 function formatRuntime(seconds) {
-  const wholeSeconds = Math.floor(seconds);
+  const wholeSeconds = Math.max(0, Math.floor(Number(seconds) || 0));
   const hours = Math.floor(wholeSeconds / 3600);
   const minutes = Math.floor((wholeSeconds % 3600) / 60);
   const remainingSeconds = wholeSeconds % 60;
-  return [hours, minutes, remainingSeconds]
-    .map((part) => String(part).padStart(2, "0"))
-    .join(":");
+  if (hours > 0) return `${hours} h ${minutes} min ${remainingSeconds} sec`;
+  if (minutes > 0) return `${minutes} min ${remainingSeconds} sec`;
+  return `${remainingSeconds} sec`;
 }
 
 function formatHours(value) {
-  return `${value.toFixed(2)} h`;
+  return `${value.toFixed(4)} h`;
 }
 
 function displayError(message, field) {
@@ -412,20 +410,12 @@ function updateEquipmentSelection(typeSelect, options, customField, customInput,
 
 function updateEquipmentLabels() {
   updateEquipmentSelection(
-    fanTypeInput,
-    fanOptions,
-    customFanField,
-    customFanPowerInput,
-    document.querySelector("#fan-range"),
-    document.querySelector("#selected-fan-power")
+    fanTypeInput, fanOptions, customFanField, customFanPowerInput,
+    document.querySelector("#fan-range"), document.querySelector("#selected-fan-power")
   );
   updateEquipmentSelection(
-    lightTypeInput,
-    lightOptions,
-    customLightField,
-    customLightPowerInput,
-    document.querySelector("#light-range"),
-    document.querySelector("#selected-light-power")
+    lightTypeInput, lightOptions, customLightField, customLightPowerInput,
+    document.querySelector("#light-range"), document.querySelector("#selected-light-power")
   );
 }
 
@@ -438,8 +428,9 @@ updateEquipmentLabels();
 function showMeasurementReadings(readings = null) {
   for (const [key, id] of Object.entries(measurementReadoutIds)) {
     const element = document.getElementById(id);
+    if (!element) continue;
     if (!readings) {
-      element.textContent = key.toLowerCase().includes("utilization") ? "--%" : "--:--:--";
+      element.textContent = key.includes("Utilization") ? "--%" : "--";
     } else if (key.toLowerCase().includes("utilization")) {
       element.textContent = `${(readings[key] * 100).toFixed(1)}%`;
     } else {
@@ -448,98 +439,136 @@ function showMeasurementReadings(readings = null) {
   }
 }
 
-async function startPrototypeMeasurement() {
-  startMeasurementButton.disabled = true;
-  measurementStatus.textContent = "Capturing start counters from the local system...";
-  try {
-    const status = await fetchCurrentStatus();
-    if (!status.connected) {
-      throw new Error("The local system is not connected. Connect it before starting a measurement.");
-    }
+const measurementStorageKey = "visionSensePrototypeMeasurementV2";
+let measurementState = {
+  activeSeconds: 0,
+  inactiveSeconds: 0,
+  lastTimestamp: Date.now(),
+  lastAiActive: false,
+  initialized: false,
+};
 
-    activeMeasurement = {
-      counters: Object.fromEntries(
-        liveRuntimeDevices.map(({ key }) => [key, status[`${key}_runtime`]])
-      ),
-      startedAt: Date.now(),
-      startedMonotonic: performance.now(),
-    };
-    completedMeasurement = null;
-    showMeasurementReadings();
-    liveMeasurementSummary.textContent = "Requires a completed prototype measurement";
-    measurementStatus.textContent = `Measurement started at ${new Date(activeMeasurement.startedAt).toLocaleTimeString()}. Keep the system running, then stop to capture the results.`;
-    stopMeasurementButton.disabled = false;
-  } catch (error) {
-    startMeasurementButton.disabled = false;
-    measurementStatus.textContent = error.message || "Could not capture live start counters.";
+function saveMeasurementState() {
+  try {
+    localStorage.setItem(measurementStorageKey, JSON.stringify(measurementState));
+  } catch {
+    // The live calculation continues even when browser storage is unavailable.
   }
 }
 
-async function stopPrototypeMeasurement() {
-  stopMeasurementButton.disabled = true;
-  measurementStatus.textContent = "Capturing stop counters from the local system...";
+function loadMeasurementState() {
   try {
-    const status = await fetchCurrentStatus();
-    if (!status.connected) {
-      throw new Error("The local system is not connected. Reconnect it and try stopping again.");
+    const saved = JSON.parse(localStorage.getItem(measurementStorageKey) || "null");
+    if (saved && Number.isFinite(saved.activeSeconds) && Number.isFinite(saved.inactiveSeconds)
+      && Number.isFinite(saved.lastTimestamp) && typeof saved.lastAiActive === "boolean") {
+      measurementState = {
+        activeSeconds: Math.max(0, saved.activeSeconds),
+        inactiveSeconds: Math.max(0, saved.inactiveSeconds),
+        lastTimestamp: saved.lastTimestamp,
+        lastAiActive: saved.lastAiActive,
+        initialized: true,
+      };
     }
-    if (!activeMeasurement) {
-      throw new Error("Start a new measurement before stopping.");
-    }
-
-    const stoppedAt = Date.now();
-    const stoppedMonotonic = performance.now();
-    const durationSeconds = (stoppedMonotonic - activeMeasurement.startedMonotonic) / 1000;
-    if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
-      throw new Error("Measurement duration must be greater than zero.");
-    }
-
-    const differences = {};
-    for (const { key } of liveRuntimeDevices) {
-      const runtime = status[`${key}_runtime`];
-      const difference = runtime - activeMeasurement.counters[key];
-      if (!Number.isFinite(difference) || difference < 0 || difference > durationSeconds + 1) {
-        throw new Error("Runtime counters changed unexpectedly during measurement. Start a new measurement and try again.");
-      }
-      // Allow one-second counter rounding, but no zone can run longer than the measured interval.
-      differences[key] = Math.min(difference, durationSeconds);
-    }
-
-    const fanUtilization = (differences.zone1_fan + differences.zone2_fan) / (2 * durationSeconds);
-    const lightUtilization = (differences.zone1_light + differences.zone2_light) / (2 * durationSeconds);
-    completedMeasurement = {
-      durationSeconds,
-      differences,
-      fanUtilization: Math.min(1, fanUtilization),
-      lightUtilization: Math.min(1, lightUtilization),
-      startedAt: activeMeasurement.startedAt,
-      stoppedAt,
-    };
-    activeMeasurement = null;
-    showMeasurementReadings({
-      duration: durationSeconds,
-      zone1Fan: differences.zone1_fan,
-      zone2Fan: differences.zone2_fan,
-      zone1Light: differences.zone1_light,
-      zone2Light: differences.zone2_light,
-      fanUtilization: completedMeasurement.fanUtilization,
-      lightUtilization: completedMeasurement.lightUtilization,
-    });
-    liveMeasurementSummary.textContent =
-      `Measured over ${formatRuntime(durationSeconds)} · ${new Date(stoppedAt).toLocaleTimeString()}`;
-    measurementStatus.textContent = `Measurement complete (${new Date(completedMeasurement.startedAt).toLocaleTimeString()}–${new Date(stoppedAt).toLocaleTimeString()}). Valid for this page session.`;
-    startMeasurementButton.disabled = false;
-  } catch (error) {
-    measurementStatus.textContent = error.message || "Could not capture live stop counters.";
-    stopMeasurementButton.disabled = false;
-    startMeasurementButton.disabled = false;
+  } catch {
+    measurementState.initialized = false;
   }
 }
 
-startMeasurementButton.addEventListener("click", startPrototypeMeasurement);
-stopMeasurementButton.addEventListener("click", stopPrototypeMeasurement);
+function updateAutomaticMeasurement(status) {
+  const now = Date.now();
+  if (!measurementState.initialized) {
+    measurementState.initialized = true;
+    measurementState.lastTimestamp = now;
+    measurementState.lastAiActive = status.ai_active === true;
+  } else {
+    const elapsed = Math.max(0, (now - measurementState.lastTimestamp) / 1000);
+    if (measurementState.lastAiActive) {
+      measurementState.activeSeconds += elapsed;
+    } else {
+      measurementState.inactiveSeconds += elapsed;
+    }
+    measurementState.lastTimestamp = now;
+    measurementState.lastAiActive = status.ai_active === true;
+  }
 
-function readRequiredNumber(name, label, options = {}) {
+  saveMeasurementState();
+  return {
+    activeSeconds: measurementState.activeSeconds,
+    inactiveSeconds: measurementState.inactiveSeconds,
+    observationSeconds: measurementState.activeSeconds + measurementState.inactiveSeconds,
+  };
+}
+
+function renderAutomaticMeasurement(status, measurement) {
+  const runtimeValues = {
+    active: measurement.activeSeconds,
+    inactive: measurement.inactiveSeconds,
+    observation: measurement.observationSeconds,
+    zone1Fan: status.zone1_fan_runtime,
+    zone2Fan: status.zone2_fan_runtime,
+    zone1Light: status.zone1_light_runtime,
+    zone2Light: status.zone2_light_runtime,
+    fanUtilization: measurement.activeSeconds > 0
+      ? Math.min(1, (status.zone1_fan_runtime + status.zone2_fan_runtime) / (2 * measurement.activeSeconds))
+      : 0,
+    lightUtilization: measurement.activeSeconds > 0
+      ? Math.min(1, (status.zone1_light_runtime + status.zone2_light_runtime) / (2 * measurement.activeSeconds))
+      : 0,
+  };
+
+  showMeasurementReadings(runtimeValues);
+  const systemState = status.ai_active === true ? "Camera / AI active" : "Camera / AI off";
+  document.getElementById("measurement-status").textContent =
+    `${systemState} · Active ${formatRuntime(measurement.activeSeconds)} · Camera off ${formatRuntime(measurement.inactiveSeconds)}`;
+  liveMeasurementSummary.textContent =
+    `Active ${formatRuntime(measurement.activeSeconds)} · Camera off ${formatRuntime(measurement.inactiveSeconds)} · Total ${formatRuntime(measurement.observationSeconds)}`;
+
+  updatePrototypeResults({
+    fan: runtimeValues.fanUtilization,
+    light: runtimeValues.lightUtilization,
+    measuredFanHours: (status.zone1_fan_runtime + status.zone2_fan_runtime) / 2 / 3600,
+    measuredLightHours: (status.zone1_light_runtime + status.zone2_light_runtime) / 2 / 3600,
+    activeHours: measurement.activeSeconds / 3600,
+    observationHours: measurement.observationSeconds / 3600,
+  }, getSelectedPower(fanTypeInput, fanOptions, customFanPowerInput),
+     getSelectedPower(lightTypeInput, lightOptions, customLightPowerInput));
+}
+
+function getSelectedPower(typeSelect, options, customInput) {
+  if (typeSelect.value === "custom") {
+    const value = Number(customInput.value);
+    return Number.isFinite(value) && value >= 0 ? value : null;
+  }
+  return options[typeSelect.value]?.watts ?? null;
+}
+
+function updatePrototypeResults(utilization, fanPower, lightPower) {
+  const basisElement = document.querySelector("#prototype-measured-basis");
+  if (!Number.isFinite(fanPower) || !Number.isFinite(lightPower)) {
+    document.querySelector("#prototype-conventional-energy").innerHTML = "— <small>kWh</small>";
+    document.querySelector("#prototype-smart-energy").innerHTML = "— <small>kWh</small>";
+    document.querySelector("#prototype-energy-saved").innerHTML = "— <small>kWh</small>";
+    document.querySelector("#prototype-saving-percent").textContent = "Select valid equipment ratings";
+    basisElement.textContent = "Waiting for valid fan and light ratings";
+    return;
+  }
+
+  const conventional = (fanPower * utilization.observationHours + lightPower * utilization.observationHours) / 1000;
+  const smart = (fanPower * utilization.measuredFanHours + lightPower * utilization.measuredLightHours) / 1000;
+  const saved = conventional - smart;
+  const savingPercent = conventional > 0 ? (saved / conventional) * 100 : null;
+
+  document.querySelector("#prototype-conventional-energy").innerHTML = formatEnergy(conventional);
+  document.querySelector("#prototype-smart-energy").innerHTML = formatEnergy(smart);
+  document.querySelector("#prototype-energy-saved").innerHTML = formatEnergy(saved);
+  document.querySelector("#prototype-saving-percent").textContent = savingPercent === null
+    ? "—"
+    : `${savingPercent.toFixed(2)}% comparison`;
+  basisElement.textContent =
+    `Smart energy from cumulative device runtime · Conventional energy uses total observation time`;
+}
+
+function readRequiredNumber(name, label, options = {}) {(name, label, options = {}) {
   const input = document.querySelector(`[name="${name}"]`);
   const value = Number(input.value);
   if (input.value.trim() === "" || !Number.isFinite(value) || value < (options.min ?? 0)) {
@@ -557,42 +586,622 @@ function readRequiredNumber(name, label, options = {}) {
   return value;
 }
 
-function getPrototypeUtilization() {
-  if (!completedMeasurement) {
-    displayError(
-      "Complete a live Prototype Measurement with Start Measurement and Stop Measurement before projecting energy.",
-      startMeasurementButton
-    );
-    return null;
+function updateProjectionResults(values, utilization, fanPower, lightPower) {
+  const conventionalFan = values.fans * fanPower * values.hours / 1000;
+  const conventionalLight = values.lights * lightPower * values.hours / 1000;
+  const conventionalTotal = conventionalFan + conventionalLight;
+  const smartFanHours = values.hours * utilization.fan;
+  const smartLightHours = values.hours * utilization.light;
+  const smartFan = values.fans * fanPower * smartFanHours / 1000;
+  const smartLight = values.lights * lightPower * smartLightHours / 1000;
+  const smartTotal = smartFan + smartLight;
+  const savedDaily = Math.max(0, conventionalTotal - smartTotal);
+  const savedMonthly = savedDaily * values.days;
+  const savedCost = savedMonthly * values.rate;
+  const savingPercent = conventionalTotal > 0 ? savedDaily / conventionalTotal * 100 : null;
+
+  document.querySelector("#conventional-fan-energy").innerHTML = formatEnergy(conventionalFan);
+  document.querySelector("#conventional-light-energy").innerHTML = formatEnergy(conventionalLight);
+  document.querySelector("#conventional-daily").innerHTML = formatEnergy(conventionalTotal);
+  document.querySelector("#smart-fan-energy").innerHTML = formatEnergy(smartFan);
+  document.querySelector("#smart-light-energy").innerHTML = formatEnergy(smartLight);
+  document.querySelector("#smart-daily").innerHTML = formatEnergy(smartTotal);
+  document.querySelector("#smart-fan-time").textContent = `Projected run time: ${smartFanHours.toFixed(2)} h/device/day`;
+  document.querySelector("#smart-light-time").textContent = `Projected run time: ${smartLightHours.toFixed(2)} h/device/day`;
+  document.querySelector("#daily-difference").innerHTML = formatEnergy(savedDaily);
+  document.querySelector("#energy-saving-percent").textContent = savingPercent === null
+    ? "— % energy saving"
+    : `${savingPercent.toFixed(2)}% estimated energy saving`;
+  document.querySelector("#monthly-difference").innerHTML = formatEnergy(savedMonthly, "kWh/month");
+  document.querySelector("#monthly-cost").textContent = rupeeFormatter.format(savedCost);
+}
+
+e strict";
+
+const backgroundCanvas = document.querySelector(".ambient-canvas");
+const backgroundContext = backgroundCanvas?.getContext("2d");
+
+if (backgroundCanvas && backgroundContext) {
+  const motionPreference = window.matchMedia("(prefers-reduced-motion: reduce)");
+  const particles = [];
+  let canvasWidth = 0;
+  let canvasHeight = 0;
+  let animationFrame = 0;
+  let previousFrame = 0;
+
+  function resizeBackground() {
+    const pixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
+    canvasWidth = window.innerWidth;
+    canvasHeight = window.innerHeight;
+    backgroundCanvas.width = Math.round(canvasWidth * pixelRatio);
+    backgroundCanvas.height = Math.round(canvasHeight * pixelRatio);
+    backgroundContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+
+    const targetCount = Math.min(90, Math.max(30, Math.round((canvasWidth * canvasHeight) / 14000)));
+    while (particles.length < targetCount) {
+      particles.push({
+        x: Math.random() * canvasWidth,
+        y: Math.random() * canvasHeight,
+        vx: (Math.random() - 0.5) * 0.18,
+        vy: (Math.random() - 0.5) * 0.14,
+        radius: 0.8 + Math.random() * 1.4,
+        hue: Math.random() > 0.55 ? 165 : 190,
+        phase: Math.random() * Math.PI * 2,
+      });
+    }
+    particles.length = targetCount;
+    drawBackground(performance.now(), 0);
   }
 
+  function drawBackground(time, delta) {
+    const context = backgroundContext;
+    context.clearRect(0, 0, canvasWidth, canvasHeight);
+
+    const glowPoints = [
+      { x: canvasWidth * (0.19 + Math.sin(time * 0.00018) * 0.08), y: canvasHeight * (0.2 + Math.cos(time * 0.00014) * 0.09), color: "37, 208, 170" },
+      { x: canvasWidth * (0.81 + Math.cos(time * 0.00012) * 0.1), y: canvasHeight * (0.37 + Math.sin(time * 0.00016) * 0.12), color: "63, 151, 255" },
+      { x: canvasWidth * (0.49 + Math.sin(time * 0.0001) * 0.12), y: canvasHeight * (0.86 + Math.cos(time * 0.00013) * 0.08), color: "133, 229, 102" },
+    ];
+
+    glowPoints.forEach((point) => {
+      const glow = context.createRadialGradient(point.x, point.y, 0, point.x, point.y, canvasWidth * 0.42);
+      glow.addColorStop(0, `rgba(${point.color}, 0.11)`);
+      glow.addColorStop(0.4, `rgba(${point.color}, 0.035)`);
+      glow.addColorStop(1, `rgba(${point.color}, 0)`);
+      context.fillStyle = glow;
+      context.fillRect(0, 0, canvasWidth, canvasHeight);
+    });
+
+    const gridSize = 76;
+    context.beginPath();
+    context.strokeStyle = "rgba(135, 193, 198, 0.035)";
+    context.lineWidth = 1;
+    for (let x = (time * 0.008) % gridSize; x < canvasWidth; x += gridSize) {
+      context.moveTo(x, 0);
+      context.lineTo(x, canvasHeight);
+    }
+    for (let y = (time * 0.005) % gridSize; y < canvasHeight; y += gridSize) {
+      context.moveTo(0, y);
+      context.lineTo(canvasWidth, y);
+    }
+    context.stroke();
+
+    particles.forEach((particle, index) => {
+      if (delta > 0) {
+        particle.x += particle.vx * delta;
+        particle.y += particle.vy * delta + Math.sin(time * 0.00055 + particle.phase) * 0.035 * delta;
+        if (particle.x < -12) particle.x = canvasWidth + 12;
+        if (particle.x > canvasWidth + 12) particle.x = -12;
+        if (particle.y < -12) particle.y = canvasHeight + 12;
+        if (particle.y > canvasHeight + 12) particle.y = -12;
+      }
+
+      for (let neighborIndex = index + 1; neighborIndex < particles.length; neighborIndex += 1) {
+        const neighbor = particles[neighborIndex];
+        const dx = neighbor.x - particle.x;
+        const dy = neighbor.y - particle.y;
+        const distance = Math.hypot(dx, dy);
+        if (distance >= 124) continue;
+
+        const opacity = (1 - distance / 124) * 0.16;
+        context.beginPath();
+        context.moveTo(particle.x, particle.y);
+        context.lineTo(neighbor.x, neighbor.y);
+        context.strokeStyle = `rgba(101, 206, 201, ${opacity})`;
+        context.lineWidth = 0.7;
+        context.stroke();
+      }
+
+      context.beginPath();
+      context.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
+      context.fillStyle = `hsla(${particle.hue}, 88%, 77%, ${0.36 + Math.sin(time * 0.001 + particle.phase) * 0.19})`;
+      context.fill();
+
+      if (index % 12 === 0) {
+        const pulse = context.createRadialGradient(particle.x, particle.y, 0, particle.x, particle.y, 18);
+        pulse.addColorStop(0, "rgba(107, 239, 213, 0.18)");
+        pulse.addColorStop(1, "rgba(107, 239, 213, 0)");
+        context.fillStyle = pulse;
+        context.fillRect(particle.x - 18, particle.y - 18, 36, 36);
+      }
+    });
+
+    glowPoints.slice(0, 2).forEach((point, index) => {
+      const progress = (time * (index === 0 ? 0.00012 : 0.00009) + index * 0.47) % 1;
+      const startX = -20;
+      const endX = canvasWidth + 20;
+      const startY = canvasHeight * (index === 0 ? 0.27 : 0.69);
+      const curveY = canvasHeight * (index === 0 ? 0.68 : 0.29);
+      const eased = progress * progress * (3 - 2 * progress);
+      const x = startX + (endX - startX) * eased;
+      const y = (1 - eased) * startY + eased * curveY
+        + Math.sin(eased * Math.PI) * canvasHeight * (index === 0 ? 0.2 : -0.19);
+
+      context.beginPath();
+      context.moveTo(startX, startY);
+      context.bezierCurveTo(canvasWidth * 0.28, startY + 50, canvasWidth * 0.68, curveY - 50, endX, curveY);
+      context.strokeStyle = "rgba(83, 217, 191, 0.055)";
+      context.lineWidth = 1;
+      context.stroke();
+
+      context.beginPath();
+      context.arc(x, y, 2.1, 0, Math.PI * 2);
+      context.fillStyle = index === 0 ? "rgba(149, 255, 211, 0.9)" : "rgba(117, 194, 255, 0.84)";
+      context.shadowColor = index === 0 ? "#65f1bb" : "#6bbdff";
+      context.shadowBlur = 15;
+      context.fill();
+      context.shadowBlur = 0;
+    });
+  }
+
+  function animateBackground(time) {
+    const delta = previousFrame ? Math.min(time - previousFrame, 32) : 0;
+    previousFrame = time;
+    drawBackground(time, delta);
+    if (!motionPreference.matches && !document.hidden) {
+      animationFrame = window.requestAnimationFrame(animateBackground);
+    }
+  }
+
+  function updateBackgroundMotion() {
+    window.cancelAnimationFrame(animationFrame);
+    previousFrame = 0;
+    window.requestAnimationFrame(animateBackground);
+  }
+
+  window.addEventListener("resize", resizeBackground);
+  document.addEventListener("visibilitychange", updateBackgroundMotion);
+  motionPreference.addEventListener("change", updateBackgroundMotion);
+  resizeBackground();
+  updateBackgroundMotion();
+}
+
+
+const startSystemButton = document.getElementById("start-system");
+const stopSystemButton = document.getElementById("stop-system");
+const systemControlStatus = document.getElementById("system-control-status");
+
+async function controlVisionSense(action) {
+  if (!startSystemButton || !stopSystemButton || !systemControlStatus) return;
+
+  const isStarting = action === "start";
+  startSystemButton.disabled = true;
+  stopSystemButton.disabled = true;
+  systemControlStatus.innerHTML = '<span class="pulse-dot"></span> ' + (isStarting
+    ? "Starting Vision Sense AI..."
+    : "Stopping Vision Sense AI...");
+
+  try {
+    const response = await fetch(`http://127.0.0.1:8766/${action}`, {
+      method: "POST",
+      cache: "no-store",
+    });
+    const result = await response.json();
+    if (!response.ok || result.ok !== true) {
+      throw new Error(result.message || "Local controller rejected the request.");
+    }
+
+    systemControlStatus.innerHTML = '<span class="pulse-dot"></span> ' + (
+      isStarting
+        ? "Vision Sense AI starting — camera and YOLO will appear on the laptop."
+        : "Vision Sense AI stopped safely."
+    );
+    startSystemButton.disabled = isStarting;
+    stopSystemButton.disabled = !isStarting;
+  } catch (error) {
+    systemControlStatus.innerHTML = '<span class="pulse-dot"></span> ' + (
+      "Local controller not running. Start vision_sense_launcher.py on this laptop."
+    );
+    startSystemButton.disabled = false;
+    stopSystemButton.disabled = true;
+  }
+}
+
+startSystemButton?.addEventListener("click", () => controlVisionSense("start"));
+stopSystemButton?.addEventListener("click", () => controlVisionSense("stop"));
+
+const runtimeDevices = {
+  "z1-fan": { runtimeId: "z1-fan-runtime", statusId: "z1-fan-status" },
+  "z1-light": { runtimeId: "z1-light-runtime", statusId: "z1-light-status" },
+  "z2-fan": { runtimeId: "z2-fan-runtime", statusId: "z2-fan-status" },
+  "z2-light": { runtimeId: "z2-light-runtime", statusId: "z2-light-status" },
+};
+
+// Update a device only when the local status endpoint supplies real runtime data.
+function updateRuntime(device, seconds, isOn) {
+  const elements = runtimeDevices[device];
+  if (!elements) {
+    throw new RangeError(`Unknown runtime device: ${device}`);
+  }
+  if (!Number.isFinite(seconds) || seconds < 0) {
+    throw new RangeError("Runtime seconds must be a finite, non-negative number.");
+  }
+  if (typeof isOn !== "boolean") {
+    throw new TypeError("Device status must be a boolean.");
+  }
+
+  const totalSeconds = Math.floor(seconds);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const remainingSeconds = totalSeconds % 60;
+
+  document.getElementById(elements.runtimeId).textContent = [
+    hours,
+    minutes,
+    remainingSeconds,
+  ].map((part) => String(part).padStart(2, "0")).join(":");
+  document.getElementById(elements.statusId).textContent = isOn ? "ON" : "OFF";
+}
+
+function updateTemperatureStatus(status) {
+  const readout = document.getElementById("live-temperature");
+  const sensorStatus = document.getElementById("temperature-sensor-status");
+  const fanCondition = document.getElementById("temperature-fan-condition");
+  const sensorNote = document.getElementById("temperature-sensor-note");
+
+  if (!readout || !sensorStatus || !fanCondition || !sensorNote) return;
+
+  const hasTemperature = status.temperature_valid === true
+    && Number.isFinite(status.temperature);
+
+  if (!hasTemperature) {
+    readout.textContent = "--";
+    sensorStatus.textContent = "AWAITING DATA";
+    fanCondition.textContent = "Waiting for sensor data";
+    sensorNote.textContent = "Waiting for live DHT22 temperature data from Arduino.";
+    return;
+  }
+
+  readout.textContent = status.temperature.toFixed(1);
+  sensorStatus.textContent = "LIVE";
+  fanCondition.textContent = status.cooling_allowed ? "FAN ALLOWED" : "FAN OFF";
+  sensorNote.textContent = status.cooling_allowed
+    ? "Temperature is above the 29°C cooling threshold."
+    : "Temperature is at or below the 29°C cooling threshold.";
+}
+
+function updateSystemConnection(isConnected) {
+  if (typeof isConnected !== "boolean") {
+    throw new TypeError("Connection status must be a boolean.");
+  }
+
+  document.getElementById("system-connection-status").textContent = isConnected
+    ? "CONNECTED"
+    : "DISCONNECTED";
+}
+
+const liveRuntimeDevices = [
+  { key: "zone1_fan", device: "z1-fan" },
+  { key: "zone1_light", device: "z1-light" },
+  { key: "zone2_fan", device: "z2-fan" },
+  { key: "zone2_light", device: "z2-light" },
+];
+let latestLiveStatus = null;
+
+async function refreshLiveStatus() {
+  try {
+    const status = await fetchCurrentStatus();
+    for (const { key, device } of liveRuntimeDevices) {
+      updateRuntime(device, status[`${key}_runtime`], status[key]);
+    }
+
+    latestLiveStatus = status;
+    updateSystemConnection(status.connected);
+    updateTemperatureStatus(status);
+  } catch {
+    latestLiveStatus = null;
+    document.getElementById("system-connection-status").textContent = "WAITING FOR CONNECTION";
+  } finally {
+    window.setTimeout(refreshLiveStatus, 1000);
+  }
+}
+
+async function fetchCurrentStatus() {
+  const response = await fetch("http://127.0.0.1:8765/status", { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(`Status server returned HTTP ${response.status}.`);
+  }
+
+  const status = await response.json();
+  if (typeof status.connected !== "boolean") {
+    throw new TypeError("Status response has no valid connection state.");
+  }
+  if (status.temperature !== null && !Number.isFinite(status.temperature)) {
+    throw new TypeError("Status response has invalid temperature data.");
+  }
+  if (typeof status.temperature_valid !== "boolean"
+    || typeof status.cooling_allowed !== "boolean") {
+    throw new TypeError("Status response has invalid temperature state.");
+  }
+
+  for (const { key } of liveRuntimeDevices) {
+    if (typeof status[key] !== "boolean"
+      || !Number.isFinite(status[`${key}_runtime`])
+      || status[`${key}_runtime`] < 0) {
+      throw new TypeError(`Status response has invalid data for ${key}.`);
+    }
+  }
+  return status;
+}
+
+const energyForm = document.querySelector("#energy-form");
+const formError = document.querySelector("#form-error");
+const liveMeasurementSummary = document.querySelector("#prototype-measured-basis");
+const measurementReadoutIds = {
+  active: "prototype-active-time",
+  inactive: "prototype-camera-off-time",
+  observation: "prototype-observation-time",
+  zone1Fan: "prototype-z1-fan-time",
+  zone2Fan: "prototype-z2-fan-time",
+  zone1Light: "prototype-z1-light-time",
+  zone2Light: "prototype-z2-light-time",
+  fanUtilization: "prototype-fan-utilization",
+  lightUtilization: "prototype-light-utilization",
+};
+
+const rupeeFormatter = new Intl.NumberFormat("en-IN", {
+  style: "currency",
+  currency: "INR",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+const fanOptions = {
+  induction: { watts: 70, range: "Typical range: 65–75 W · calculation value: 70 W" },
+  bldc: { watts: 32, range: "Typical range: 28–35 W · calculation value: 32 W" },
+};
+const lightOptions = {
+  "led-tube": { watts: 20, range: "Typical range: 18–22 W · calculation value: 20 W" },
+  "led-bulb": { watts: 10, range: "Typical range: 7–12 W · calculation value: 10 W" },
+  fluorescent: { watts: 38, range: "Typical range: 36–40 W · calculation value: 38 W" },
+  incandescent: { watts: 80, range: "Typical range: 60–100 W · calculation value: 80 W" },
+};
+
+function formatEnergy(value, unit = "kWh") {
+  if (!Number.isFinite(value)) return `-- <small>${unit}</small>`;
+  const decimals = Math.abs(value) < 0.001 && value !== 0 ? 6 : 3;
+  return `${value.toFixed(decimals)} <small>${unit}</small>`;
+}
+
+function formatRuntime(seconds) {
+  const wholeSeconds = Math.max(0, Math.floor(Number(seconds) || 0));
+  const hours = Math.floor(wholeSeconds / 3600);
+  const minutes = Math.floor((wholeSeconds % 3600) / 60);
+  const remainingSeconds = wholeSeconds % 60;
+  if (hours > 0) return `${hours} h ${minutes} min ${remainingSeconds} sec`;
+  if (minutes > 0) return `${minutes} min ${remainingSeconds} sec`;
+  return `${remainingSeconds} sec`;
+}
+
+function formatHours(value) {
+  return `${value.toFixed(4)} h`;
+}
+
+function displayError(message, field) {
+  formError.textContent = message;
+  formError.hidden = false;
+  if (field) field.focus();
+}
+
+const fanTypeInput = document.querySelector("#fan-type");
+const lightTypeInput = document.querySelector("#light-type");
+const customFanField = document.querySelector("#custom-fan-field");
+const customLightField = document.querySelector("#custom-light-field");
+const customFanPowerInput = document.querySelector("#custom-fan-power");
+const customLightPowerInput = document.querySelector("#custom-light-power");
+
+function updateEquipmentSelection(typeSelect, options, customField, customInput, range, selectedPower) {
+  const isCustom = typeSelect.value === "custom";
+  customField.hidden = !isCustom;
+  customInput.required = isCustom;
+
+  if (isCustom) {
+    range.textContent = "Enter the exact rated power shown on the device.";
+    selectedPower.textContent = customInput.value ? `${customInput.value} W` : "Enter custom rating";
+    return;
+  }
+
+  const option = options[typeSelect.value];
+  range.textContent = option.range;
+  selectedPower.textContent = `${option.watts} W`;
+}
+
+function updateEquipmentLabels() {
+  updateEquipmentSelection(
+    fanTypeInput, fanOptions, customFanField, customFanPowerInput,
+    document.querySelector("#fan-range"), document.querySelector("#selected-fan-power")
+  );
+  updateEquipmentSelection(
+    lightTypeInput, lightOptions, customLightField, customLightPowerInput,
+    document.querySelector("#light-range"), document.querySelector("#selected-light-power")
+  );
+}
+
+fanTypeInput.addEventListener("change", updateEquipmentLabels);
+lightTypeInput.addEventListener("change", updateEquipmentLabels);
+customFanPowerInput.addEventListener("input", updateEquipmentLabels);
+customLightPowerInput.addEventListener("input", updateEquipmentLabels);
+updateEquipmentLabels();
+
+function showMeasurementReadings(readings = null) {
+  for (const [key, id] of Object.entries(measurementReadoutIds)) {
+    const element = document.getElementById(id);
+    if (!element) continue;
+    if (!readings) {
+      element.textContent = key.includes("Utilization") ? "--%" : "--";
+    } else if (key.toLowerCase().includes("utilization")) {
+      element.textContent = `${(readings[key] * 100).toFixed(1)}%`;
+    } else {
+      element.textContent = formatRuntime(readings[key]);
+    }
+  }
+}
+
+const measurementStorageKey = "visionSensePrototypeMeasurementV2";
+let measurementState = {
+  activeSeconds: 0,
+  inactiveSeconds: 0,
+  lastTimestamp: Date.now(),
+  lastAiActive: false,
+  initialized: false,
+};
+
+function saveMeasurementState() {
+  try {
+    localStorage.setItem(measurementStorageKey, JSON.stringify(measurementState));
+  } catch {
+    // The live calculation continues even when browser storage is unavailable.
+  }
+}
+
+function loadMeasurementState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(measurementStorageKey) || "null");
+    if (saved && Number.isFinite(saved.activeSeconds) && Number.isFinite(saved.inactiveSeconds)
+      && Number.isFinite(saved.lastTimestamp) && typeof saved.lastAiActive === "boolean") {
+      measurementState = {
+        activeSeconds: Math.max(0, saved.activeSeconds),
+        inactiveSeconds: Math.max(0, saved.inactiveSeconds),
+        lastTimestamp: saved.lastTimestamp,
+        lastAiActive: saved.lastAiActive,
+        initialized: true,
+      };
+    }
+  } catch {
+    measurementState.initialized = false;
+  }
+}
+
+function updateAutomaticMeasurement(status) {
+  const now = Date.now();
+  if (!measurementState.initialized) {
+    measurementState.initialized = true;
+    measurementState.lastTimestamp = now;
+    measurementState.lastAiActive = status.ai_active === true;
+  } else {
+    const elapsed = Math.max(0, (now - measurementState.lastTimestamp) / 1000);
+    if (measurementState.lastAiActive) {
+      measurementState.activeSeconds += elapsed;
+    } else {
+      measurementState.inactiveSeconds += elapsed;
+    }
+    measurementState.lastTimestamp = now;
+    measurementState.lastAiActive = status.ai_active === true;
+  }
+
+  saveMeasurementState();
   return {
-    fan: completedMeasurement.fanUtilization,
-    light: completedMeasurement.lightUtilization,
-    measuredFanHours: (
-      completedMeasurement.differences.zone1_fan + completedMeasurement.differences.zone2_fan
-    ) / 2 / 3600,
-    measuredLightHours: (
-      completedMeasurement.differences.zone1_light + completedMeasurement.differences.zone2_light
-    ) / 2 / 3600,
-    periodHours: completedMeasurement.durationSeconds / 3600,
+    activeSeconds: measurementState.activeSeconds,
+    inactiveSeconds: measurementState.inactiveSeconds,
+    observationSeconds: measurementState.activeSeconds + measurementState.inactiveSeconds,
   };
 }
 
+function renderAutomaticMeasurement(status, measurement) {
+  const runtimeValues = {
+    active: measurement.activeSeconds,
+    inactive: measurement.inactiveSeconds,
+    observation: measurement.observationSeconds,
+    zone1Fan: status.zone1_fan_runtime,
+    zone2Fan: status.zone2_fan_runtime,
+    zone1Light: status.zone1_light_runtime,
+    zone2Light: status.zone2_light_runtime,
+    fanUtilization: measurement.activeSeconds > 0
+      ? Math.min(1, (status.zone1_fan_runtime + status.zone2_fan_runtime) / (2 * measurement.activeSeconds))
+      : 0,
+    lightUtilization: measurement.activeSeconds > 0
+      ? Math.min(1, (status.zone1_light_runtime + status.zone2_light_runtime) / (2 * measurement.activeSeconds))
+      : 0,
+  };
+
+  showMeasurementReadings(runtimeValues);
+  const systemState = status.ai_active === true ? "Camera / AI active" : "Camera / AI off";
+  document.getElementById("measurement-status").textContent =
+    `${systemState} · Active ${formatRuntime(measurement.activeSeconds)} · Camera off ${formatRuntime(measurement.inactiveSeconds)}`;
+  liveMeasurementSummary.textContent =
+    `Active ${formatRuntime(measurement.activeSeconds)} · Camera off ${formatRuntime(measurement.inactiveSeconds)} · Total ${formatRuntime(measurement.observationSeconds)}`;
+
+  updatePrototypeResults({
+    fan: runtimeValues.fanUtilization,
+    light: runtimeValues.lightUtilization,
+    measuredFanHours: (status.zone1_fan_runtime + status.zone2_fan_runtime) / 2 / 3600,
+    measuredLightHours: (status.zone1_light_runtime + status.zone2_light_runtime) / 2 / 3600,
+    activeHours: measurement.activeSeconds / 3600,
+    observationHours: measurement.observationSeconds / 3600,
+  }, getSelectedPower(fanTypeInput, fanOptions, customFanPowerInput),
+     getSelectedPower(lightTypeInput, lightOptions, customLightPowerInput));
+}
+
+function getSelectedPower(typeSelect, options, customInput) {
+  if (typeSelect.value === "custom") {
+    const value = Number(customInput.value);
+    return Number.isFinite(value) && value >= 0 ? value : null;
+  }
+  return options[typeSelect.value]?.watts ?? null;
+}
+
 function updatePrototypeResults(utilization, fanPower, lightPower) {
-  const conventional = (fanPower * 7 + lightPower * 7) / 1000;
-  const smart = (fanPower * utilization.fan * 7 + lightPower * utilization.light * 7) / 1000;
-  const saved = Math.max(0, conventional - smart);
+  const basisElement = document.querySelector("#prototype-measured-basis");
+  if (!Number.isFinite(fanPower) || !Number.isFinite(lightPower)) {
+    document.querySelector("#prototype-conventional-energy").innerHTML = "— <small>kWh</small>";
+    document.querySelector("#prototype-smart-energy").innerHTML = "— <small>kWh</small>";
+    document.querySelector("#prototype-energy-saved").innerHTML = "— <small>kWh</small>";
+    document.querySelector("#prototype-saving-percent").textContent = "Select valid equipment ratings";
+    basisElement.textContent = "Waiting for valid fan and light ratings";
+    return;
+  }
+
+  const conventional = (fanPower * utilization.observationHours + lightPower * utilization.observationHours) / 1000;
+  const smart = (fanPower * utilization.measuredFanHours + lightPower * utilization.measuredLightHours) / 1000;
+  const saved = conventional - smart;
   const savingPercent = conventional > 0 ? (saved / conventional) * 100 : null;
 
   document.querySelector("#prototype-conventional-energy").innerHTML = formatEnergy(conventional);
   document.querySelector("#prototype-smart-energy").innerHTML = formatEnergy(smart);
   document.querySelector("#prototype-energy-saved").innerHTML = formatEnergy(saved);
   document.querySelector("#prototype-saving-percent").textContent = savingPercent === null
-    ? "— %"
-    : `${savingPercent.toFixed(2)}% energy saving`;
-  document.querySelector("#prototype-measured-basis").textContent =
-    `Measured fan ${formatHours(utilization.measuredFanHours)} · light ${formatHours(utilization.measuredLightHours)} / ${formatHours(utilization.periodHours)}`;
+    ? "—"
+    : `${savingPercent.toFixed(2)}% comparison`;
+  basisElement.textContent =
+    `Smart energy from cumulative device runtime · Conventional energy uses total observation time`;
+}
+
+function readRequiredNumber(name, label, options = {}) {(name, label, options = {}) {
+  const input = document.querySelector(`[name="${name}"]`);
+  const value = Number(input.value);
+  if (input.value.trim() === "" || !Number.isFinite(value) || value < (options.min ?? 0)) {
+    displayError(`${label} must be a valid number of ${options.min === undefined ? "zero or greater" : "greater than zero"}.`, input);
+    return null;
+  }
+  if (options.max !== undefined && value > options.max) {
+    displayError(`${label} cannot be greater than ${options.max}.`, input);
+    return null;
+  }
+  if (options.integer && !Number.isInteger(value)) {
+    displayError(`${label} must be a whole number.`, input);
+    return null;
+  }
+  return value;
 }
 
 function updateProjectionResults(values, utilization, fanPower, lightPower) {
@@ -661,4 +1270,4 @@ energyForm.addEventListener("submit", (event) => {
   updateProjectionResults(values, utilization, fanPower, lightPower);
 });
 
-refreshLiveStatus();
+loadMeasurementState();\nrefreshLiveStatus();
