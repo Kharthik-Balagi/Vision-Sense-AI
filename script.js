@@ -587,7 +587,7 @@ function renderAutomaticMeasurement(status, measurement) {
     measurement,
     getSelectedPower(fanTypeInput, fanOptions, customFanPowerInput),
     getSelectedPower(lightTypeInput, lightOptions, customLightPowerInput),
-    Number(document.querySelector("#vision-sense-ai-power")?.value)
+    30
   );
 }
 
@@ -749,11 +749,9 @@ energyForm.addEventListener("submit", (event) => {
     return;
   }
 
-  const aiPower = Number(document.querySelector("#vision-sense-ai-power")?.value);
-  if (!Number.isFinite(aiPower) || aiPower < 0) {
-    displayError("Enter the total Vision Sense AI system power in watts.", document.querySelector("#vision-sense-ai-power"));
-    return;
-  }
+  // Fixed Vision Sense AI system power: 30 W.
+  // At the default 7-hour school day this is 30 × 7 / 1000 = 0.21 kWh/day.
+  const aiPower = 30;
 
   if (latestMeasurement.observationSeconds <= 0) {
     displayError("Wait until the live system has recorded some observation time before calculating the classroom projection.");
