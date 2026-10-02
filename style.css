@@ -26,7 +26,8 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline: 3px solid 
 
 .site-header { position: relative; z-index: 2; height: 76px; padding-inline: max(32px, calc((100vw - var(--shell)) / 2)); display: flex; align-items: center; justify-content: space-between; gap: 28px; border-bottom: 1px solid rgba(161, 213, 202, .1); background: rgba(5, 19, 29, .76); color: #f4f8f4; backdrop-filter: blur(18px); }
 .brand { display: inline-flex; align-items: center; gap: 10px; font-family: var(--font-display); font-size: 11px; line-height: 1.05; font-weight: 800; letter-spacing: .11em; }
-.brand-mark { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 10px 10px 10px 3px; color: var(--ink-deep); background: var(--mint); font-size: 10px; letter-spacing: -.04em; }
+.brand-mark { width: 42px; height: 32px; display: grid; place-items: center; flex: 0 0 42px; background: transparent; color: var(--mint); }
+.vision-logo { width: 42px; height: 30px; display: block; overflow: visible; filter: drop-shadow(0 0 7px rgba(101,245,194,.18)); }
 .brand-light { display: block; margin-top: 4px; color: #a3b1b5; font-size: 8px; letter-spacing: .2em; }
 .main-nav { display: flex; align-items: center; gap: 34px; margin-left: auto; }
 .main-nav a, .header-link { color: #b6c2c4; font-size: 12px; transition: color .2s ease; }
