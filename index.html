@@ -107,7 +107,7 @@
               <span class="calculator-step">01</span>
               <div><span class="form-step">MEASURED PROTOTYPE DATA</span><h3 id="prototype-title">Prototype Energy Comparison</h3></div>
             </div>
-            <p class="calculator-intro">Prototype Measurement is captured automatically from the live system. When the camera/AI is active, active time accumulates; when the camera is off, that time is tracked separately. The energy comparison updates automatically.</p>
+            <p class="calculator-intro">Measurement starts only after START SYSTEM is clicked. Active and camera-off time are then measured in that fresh session and freeze when STOP SYSTEM is clicked. Enter the total Vision Sense AI system power to include it in the smart energy result.</p>
             <div class="measurement-layout">
               <div class="measurement-controls">
                 <div class="live-measurements">
@@ -121,8 +121,7 @@
                     <div><span>Zone 2 fan ON time</span><strong id="prototype-z2-fan-time">--</strong></div>
                     <div><span>Zone 1 light ON time</span><strong id="prototype-z1-light-time">--</strong></div>
                     <div><span>Zone 2 light ON time</span><strong id="prototype-z2-light-time">--</strong></div>
-                    <div><span>Overall fan utilization</span><strong id="prototype-fan-utilization">--%</strong></div>
-                    <div><span>Overall light utilization</span><strong id="prototype-light-utilization">--%</strong></div>
+                    <div><span>Vision Sense AI system power</span><strong><label class="inline-power-input"><input id="vision-sense-ai-power" type="number" min="0" step="0.1" placeholder="Enter watts" inputmode="decimal" aria-label="Vision Sense AI system power in watts"><small>W</small></label></strong></div>
                   </div>
                 </div>
               </div>
@@ -130,7 +129,7 @@
                 <div class="subsection-label"><span>CONVENTIONAL CLASSROOM</span><span>1 fan + 1 light · 7 hours</span></div>
                 <div class="prototype-metric"><span>Conventional Energy</span><strong id="prototype-conventional-energy">— <small>kWh/day</small></strong></div>
                 <div class="prototype-metric"><span>Smart Classroom Energy <small id="prototype-measured-basis">Waiting for automatic measurement</small></span><strong id="prototype-smart-energy">— <small>kWh/day</small></strong></div>
-                <div class="prototype-saving"><span>Energy Saved <small>Estimated from prototype utilization</small></span><strong id="prototype-energy-saved">— <small>kWh/day</small></strong><span class="saving-percent" id="prototype-saving-percent">— %</span></div>
+                <div class="prototype-saving"><span>Energy Saved <small>Conventional energy minus Smart Classroom energy</small></span><strong id="prototype-energy-saved">— <small>kWh/day</small></strong><span class="saving-percent" id="prototype-saving-percent">— %</span></div>
               </div>
             </div>
           </section>
