@@ -479,6 +479,7 @@ function loadMeasurementState() {
     lastAiActive: false,
     initialized: false,
     running: false,
+    liveStarted: false,
     runtimeBaseline: null,
   };
 }
@@ -491,7 +492,9 @@ function startMeasurementSession(status = null) {
     lastAiActive: status?.ai_active === true,
     initialized: false,
     running: true,
-    runtimeBaseline: status ? {
+    liveStarted: false,
+    runtimeBaseline: null,
+    runtimeBaselinePending: status ? {
       zone1_fan: Number(status.zone1_fan_runtime) || 0,
       zone2_fan: Number(status.zone2_fan_runtime) || 0,
       zone1_light: Number(status.zone1_light_runtime) || 0,
@@ -515,19 +518,22 @@ function updateAutomaticMeasurement(status) {
 
   const now = Date.now();
 
-  if (!measurementState.runtimeBaseline) {
+  if (!measurementState.liveStarted) {
+    // Do not count Python startup as camera-off time. The measurement clock
+    // begins only when the live AI actually reports active.
+    if (status.ai_active !== true) {
+      return getMeasurementSnapshot(status);
+    }
+    measurementState.liveStarted = true;
+    measurementState.initialized = true;
+    measurementState.lastTimestamp = now;
+    measurementState.lastAiActive = true;
     measurementState.runtimeBaseline = {
       zone1_fan: Number(status.zone1_fan_runtime) || 0,
       zone2_fan: Number(status.zone2_fan_runtime) || 0,
       zone1_light: Number(status.zone1_light_runtime) || 0,
       zone2_light: Number(status.zone2_light_runtime) || 0,
     };
-  }
-
-  if (!measurementState.initialized) {
-    measurementState.initialized = true;
-    measurementState.lastTimestamp = now;
-    measurementState.lastAiActive = status.ai_active === true;
   } else {
     const elapsed = Math.max(0, (now - measurementState.lastTimestamp) / 1000);
     if (measurementState.lastAiActive) {
