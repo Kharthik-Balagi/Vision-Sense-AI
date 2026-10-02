@@ -641,29 +641,38 @@ function formatEnergyRuntime(seconds) {
 
 function updateEnergyRuntime(status) {
   if (!status) return;
-  const fields = [
-    "zone1_fan_runtime",
-    "zone1_light_runtime",
-    "zone2_fan_runtime",
-    "zone2_light_runtime",
-  ];
 
-  fields.forEach((field) => {
-    if (Number.isFinite(status[field]) && status[field] >= 0) {
-      latestEnergyRuntime[field] = status[field];
-      const element = energyRuntimeFields[field];
-      if (element) element.textContent = formatEnergyRuntime(status[field]);
-    }
+  const measured = latestMeasurement && Number(latestMeasurement.observationSeconds) > 0
+    ? {
+        zone1_fan_runtime: Number(latestMeasurement.zone1FanSeconds) || 0,
+        zone1_light_runtime: Number(latestMeasurement.zone1LightSeconds) || 0,
+        zone2_fan_runtime: Number(latestMeasurement.zone2FanSeconds) || 0,
+        zone2_light_runtime: Number(latestMeasurement.zone2LightSeconds) || 0,
+      }
+    : null;
+
+  const source = measured || {
+    zone1_fan_runtime: Number(status.zone1_fan_runtime) || 0,
+    zone1_light_runtime: Number(status.zone1_light_runtime) || 0,
+    zone2_fan_runtime: Number(status.zone2_fan_runtime) || 0,
+    zone2_light_runtime: Number(status.zone2_light_runtime) || 0,
+  };
+
+  Object.keys(energyRuntimeFields).forEach((field) => {
+    latestEnergyRuntime[field] = Math.max(0, source[field] || 0);
+    const element = energyRuntimeFields[field];
+    if (element) element.textContent = formatEnergyRuntime(latestEnergyRuntime[field]);
   });
 
-  const measuredTotal = fields.reduce((sum, field) => sum + latestEnergyRuntime[field], 0);
+  const measuredTotal = Object.values(latestEnergyRuntime).reduce((sum, value) => sum + value, 0);
   if (energyRuntimeSource) {
-    energyRuntimeSource.textContent = measuredTotal > 0
-      ? "Live measured prototype runtime"
-      : "No measured runtime yet";
+    energyRuntimeSource.textContent = measured
+      ? "Latest measured session runtime"
+      : measuredTotal > 0
+        ? "Live system runtime"
+        : "No measured runtime yet";
   }
 }
-
 function readPositiveInput(input, label, allowZero = false) {
   const value = Number(input?.value);
   const minimum = allowZero ? 0 : Number.EPSILON;
@@ -698,43 +707,34 @@ function calculateEnergyImpact() {
   const tariff = readPositiveInput(energyInputs.tariff, "Electricity tariff", true);
 
   const zoneCount = 2;
+  const conventionalDailyKwh =
+    (((fanWatts * fansPerZone) + (lightWatts * lightsPerZone)) * zoneCount * hours) / 1000;
 
-  const conventionalWhPerDay =
-    ((fanWatts * fansPerZone) + (lightWatts * lightsPerZone)) * zoneCount * hours;
+  const observationSeconds = Number(latestMeasurement?.observationSeconds) || 0;
+  if (observationSeconds <= 0) {
+    throw new Error("No completed measurement session is available. Start the system, observe a representative period, then stop it before calculating.");
+  }
 
-  const smartFanWhPerDay =
+  const measuredSmartWh =
     fanWatts * fansPerZone *
-    ((latestEnergyRuntime.zone1_fan_runtime + latestEnergyRuntime.zone2_fan_runtime) / 3600);
+      ((Number(latestMeasurement.zone1FanSeconds) + Number(latestMeasurement.zone2FanSeconds)) / 3600)
+    + lightWatts * lightsPerZone *
+      ((Number(latestMeasurement.zone1LightSeconds) + Number(latestMeasurement.zone2LightSeconds)) / 3600);
 
-  const smartLightWhPerDay =
-    lightWatts * lightsPerZone *
-    ((latestEnergyRuntime.zone1_light_runtime + latestEnergyRuntime.zone2_light_runtime) / 3600);
-
-  const smartWhPerMeasuredRun = smartFanWhPerDay + smartLightWhPerDay;
-
-  if (smartWhPerMeasuredRun <= 0) {
-    throw new Error("No Vision Sense AI runtime has been measured yet. Start the system and record a representative run first.");
+  const observationHours = observationSeconds / 3600;
+  if (observationHours <= 0) {
+    throw new Error("The measurement observation time is zero. Run the prototype for a measurable period.");
   }
 
-  const measuredRunHours = Math.max(
-    latestEnergyRuntime.zone1_fan_runtime,
-    latestEnergyRuntime.zone1_light_runtime,
-    latestEnergyRuntime.zone2_fan_runtime,
-    latestEnergyRuntime.zone2_light_runtime,
-  ) / 3600;
+  // Convert the measured prototype energy into an average smart-system power
+  // over the observation, then project that average behaviour across the
+  // classroom's stated daily operating hours.
+  const averageSmartWatts = (measuredSmartWh / observationHours);
+  const smartDailyKwh = Math.min(
+    (averageSmartWatts * hours) / 1000,
+    conventionalDailyKwh
+  );
 
-  if (measuredRunHours <= 0) {
-    throw new Error("The measured runtime is zero. Run the prototype before calculating.");
-  }
-
-  /*
-   * The prototype may be observed for a period shorter than the classroom schedule.
-   * Convert the measured smart device energy into a daily value using the measured
-   * device runtime pattern, but do not let the scaled smart result exceed the
-   * conventional baseline for the same classroom.
-   */
-  const smartDailyKwh = Math.min(smartWhPerMeasuredRun / 1000, conventionalWhPerDay / 1000);
-  const conventionalDailyKwh = conventionalWhPerDay / 1000;
   const savedDailyKwh = Math.max(0, conventionalDailyKwh - smartDailyKwh);
   const savingPercent = conventionalDailyKwh > 0
     ? (savedDailyKwh / conventionalDailyKwh) * 100
@@ -746,7 +746,8 @@ function calculateEnergyImpact() {
   document.getElementById("energy-conventional").textContent = formatKwh(conventionalDailyKwh);
   document.getElementById("energy-smart").textContent = formatKwh(smartDailyKwh);
   document.getElementById("energy-saved").textContent = `${formatKwh(savedDailyKwh)} kWh`;
-  document.getElementById("energy-saved-period").textContent = `${formatKwh(savedDailyKwh)} kWh saved per classroom per school day`;
+  document.getElementById("energy-saved-period").textContent =
+    `${formatKwh(savedDailyKwh)} kWh saved per classroom per school day`;
   document.getElementById("energy-percent").textContent = `${savingPercent.toFixed(1)}%`;
   document.getElementById("energy-annual").textContent = formatKwh(annualSavedKwh);
   document.getElementById("energy-cost").textContent = formatMoney(annualCostSaved);
