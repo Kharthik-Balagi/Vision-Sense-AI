@@ -661,32 +661,55 @@ function readRequiredNumber(name, label, options = {}) {
   return value;
 }
 
-function updateProjectionResults(values, utilization, fanPower, lightPower) {
+function updateProjectionResults(values, utilization, fanPower, lightPower, aiPower) {
+  // Conventional classroom: every selected fan and light runs for the full
+  // school operating period.
   const conventionalFan = values.fans * fanPower * values.hours / 1000;
   const conventionalLight = values.lights * lightPower * values.hours / 1000;
   const conventionalTotal = conventionalFan + conventionalLight;
+
+  // Smart classroom: use the measured prototype ON-time fraction over the
+  // complete observation period (AI active + camera-off/standby). This is the
+  // correct denominator because both occupied and unoccupied periods are part
+  // of the real energy-saving behaviour.
   const smartFanHours = values.hours * utilization.fan;
   const smartLightHours = values.hours * utilization.light;
   const smartFan = values.fans * fanPower * smartFanHours / 1000;
   const smartLight = values.lights * lightPower * smartLightHours / 1000;
-  const smartTotal = smartFan + smartLight;
-  const savedDaily = Math.max(0, conventionalTotal - smartTotal);
+
+  // Vision Sense AI itself also consumes power while the classroom system runs.
+  const smartAi = aiPower * values.hours / 1000;
+  const smartTotal = smartFan + smartLight + smartAi;
+
+  // Keep the signed result: if the AI system's own consumption exceeds the
+  // device energy reduction, the result correctly becomes negative.
+  const savedDaily = conventionalTotal - smartTotal;
   const savedMonthly = savedDaily * values.days;
   const savedCost = savedMonthly * values.rate;
-  const savingPercent = conventionalTotal > 0 ? savedDaily / conventionalTotal * 100 : null;
+  const savingPercent = conventionalTotal > 0
+    ? (savedDaily / conventionalTotal) * 100
+    : null;
 
   document.querySelector("#conventional-fan-energy").innerHTML = formatEnergy(conventionalFan);
   document.querySelector("#conventional-light-energy").innerHTML = formatEnergy(conventionalLight);
   document.querySelector("#conventional-daily").innerHTML = formatEnergy(conventionalTotal);
+
   document.querySelector("#smart-fan-energy").innerHTML = formatEnergy(smartFan);
   document.querySelector("#smart-light-energy").innerHTML = formatEnergy(smartLight);
   document.querySelector("#smart-daily").innerHTML = formatEnergy(smartTotal);
-  document.querySelector("#smart-fan-time").textContent = `Projected run time: ${smartFanHours.toFixed(2)} h/device/day`;
-  document.querySelector("#smart-light-time").textContent = `Projected run time: ${smartLightHours.toFixed(2)} h/device/day`;
+
+  document.querySelector("#smart-fan-time").textContent =
+    `Projected run time: ${smartFanHours.toFixed(2)} h/device/day`;
+  document.querySelector("#smart-light-time").textContent =
+    `Projected run time: ${smartLightHours.toFixed(2)} h/device/day`;
+  document.querySelector("#smart-ai-energy").innerHTML = formatEnergy(smartAi);
+  document.querySelector("#smart-ai-time").textContent =
+    `AI system power: ${aiPower.toFixed(1)} W × ${values.hours.toFixed(2)} h/day`;
+
   document.querySelector("#daily-difference").innerHTML = formatEnergy(savedDaily);
   document.querySelector("#energy-saving-percent").textContent = savingPercent === null
-    ? "— % energy saving"
-    : `${savingPercent.toFixed(2)}% estimated energy saving`;
+    ? "— % net energy difference"
+    : `${savingPercent.toFixed(2)}% net energy difference`;
   document.querySelector("#monthly-difference").innerHTML = formatEnergy(savedMonthly, "kWh/month");
   document.querySelector("#monthly-cost").textContent = rupeeFormatter.format(savedCost);
 }
@@ -732,16 +755,26 @@ energyForm.addEventListener("submit", (event) => {
     return;
   }
 
+  if (latestMeasurement.observationSeconds <= 0) {
+    displayError("Wait until the live system has recorded some observation time before calculating the classroom projection.");
+    return;
+  }
+
+  const observationSeconds = latestMeasurement.observationSeconds;
   const utilization = {
-    fan: latestMeasurement.activeSeconds > 0
-      ? Math.min(1, (latestMeasurement.zone1FanSeconds + latestMeasurement.zone2FanSeconds) / (2 * latestMeasurement.activeSeconds))
-      : 0,
-    light: latestMeasurement.activeSeconds > 0
-      ? Math.min(1, (latestMeasurement.zone1LightSeconds + latestMeasurement.zone2LightSeconds) / (2 * latestMeasurement.activeSeconds))
-      : 0,
+    fan: Math.min(
+      1,
+      (latestMeasurement.zone1FanSeconds + latestMeasurement.zone2FanSeconds)
+        / (2 * observationSeconds)
+    ),
+    light: Math.min(
+      1,
+      (latestMeasurement.zone1LightSeconds + latestMeasurement.zone2LightSeconds)
+        / (2 * observationSeconds)
+    ),
   };
 
-  updateProjectionResults(values, utilization, fanPower, lightPower);
+  updateProjectionResults(values, utilization, fanPower, lightPower, aiPower);
 });
 
 loadMeasurementState();
