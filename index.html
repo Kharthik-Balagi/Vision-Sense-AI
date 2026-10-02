@@ -246,11 +246,11 @@
       <div class="section-shell temperature-inner">
         <div class="temperature-copy"><p class="eyebrow">TEMPERATURE INPUT</p><h2>Comfort matters<br><span>to energy, too.</span></h2><p>The DHT22 temperature sensor is used by the physical prototype. Fan operation can take temperature into account.</p></div>
         <article class="temperature-card">
-          <div class="temp-card-top"><span>CLASSROOM CONDITION</span><span class="sensor-status"><i></i> AWAITING DATA</span></div>
-          <div class="temp-readout"><strong>--</strong><span>°C</span></div>
+          <div class="temp-card-top"><span>CLASSROOM CONDITION</span><span class="sensor-status"><i></i> <span id="temperature-sensor-status">AWAITING DATA</span></span></div>
+          <div class="temp-readout"><strong id="live-temperature">--</strong><span>°C</span></div>
           <div class="temp-divider"></div>
-          <div class="fan-condition"><span class="temp-icon">⌁</span><span><small>FAN CONDITION</small><strong>Waiting for sensor data</strong></span></div>
-          <p>This display is not receiving live temperature data.</p>
+          <div class="fan-condition"><span class="temp-icon">⌁</span><span><small>FAN CONDITION</small><strong id="temperature-fan-condition">Waiting for sensor data</strong></span></div>
+          <p id="temperature-sensor-note">Waiting for live DHT22 temperature data from Arduino.</p>
         </article>
       </div>
     </section>
