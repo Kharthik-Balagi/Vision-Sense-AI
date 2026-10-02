@@ -184,9 +184,6 @@ async function controlVisionSense(action) {
 
     if (isStarting) {
       startMeasurementSession(null);
-      if (latestLiveStatus?.connected === true) {
-        latestMeasurement = updateAutomaticMeasurement(latestLiveStatus);
-      }
     } else {
       stopMeasurementSession(latestLiveStatus);
       if (latestLiveStatus) renderAutomaticMeasurement(latestLiveStatus, latestMeasurement);
