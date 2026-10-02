@@ -32,10 +32,10 @@
     </a>
     <nav class="main-nav" aria-label="Main navigation">
       <a href="#temperature">Temperature</a>
-      <a href="#calculator">Calculator</a>
+      <a href="#comparison">Comparison</a>
       <a href="#runtime">Device data</a>
     </nav>
-    <a class="header-link" href="#calculator">Explore savings <span aria-hidden="true">↗</span></a>
+    <a class="header-link" href="#comparison">See the comparison <span aria-hidden="true">↗</span></a>
   </header>
 
   <main>
@@ -95,120 +95,33 @@
       </div>
     </section>
 
-    <section class="calculator-section" id="calculator">
+    <section class="comparison-section" id="comparison" aria-labelledby="comparison-title">
       <div class="section-shell section-pad">
         <div class="section-heading">
-          <div><p class="eyebrow eyebrow-dark">MEASURE. COMPARE. PROJECT.</p><h2>Energy Saving <span>Calculator</span></h2></div>
-          <p class="heading-aside">Start with measured prototype utilization, then use it to estimate energy use for a larger classroom.</p>
+          <div><p class="eyebrow eyebrow-dark">THE CORE IDEA</p><h2 id="comparison-title">Vision Sense AI <span>vs Conventional</span></h2></div>
+          <p class="heading-aside">The difference is simple: the conventional classroom powers the whole room, while Vision Sense AI responds to where students actually are.</p>
         </div>
-        <div class="calculator-sections">
-          <section class="calculator-block prototype-block" aria-labelledby="prototype-title">
-            <div class="calculator-block-heading">
-              <span class="calculator-step">01</span>
-              <div><span class="form-step">MEASURED PROTOTYPE DATA</span><h3 id="prototype-title">Prototype Energy Comparison</h3></div>
-            </div>
-            <p class="calculator-intro">Measurement starts only after START SYSTEM is clicked. Active and camera-off time are measured in that fresh session and freeze when STOP SYSTEM is clicked. The prototype comparison uses the same two-zone classroom: 2 conventional fans + 2 conventional lights versus the measured Zone 1 + Zone 2 smart runtime, plus 30 W of Vision Sense AI system power.</p>
-            <div class="measurement-layout">
-              <div class="measurement-controls">
-                <div class="live-measurements">
-                  <p class="form-hint">Automatic measurement: active time starts when the camera/AI becomes active, pauses when the camera turns off, and resumes automatically when the system starts again. The accumulated values are retained in this browser.</p>
-                  <p class="measurement-status" id="measurement-status" aria-live="polite">Waiting for a connection to the local status server.</p>
-                  <div class="measurement-readouts" aria-live="polite">
-                    <div><span>Camera / AI active time</span><strong id="prototype-active-time">--</strong></div>
-                    <div><span>Camera-off time</span><strong id="prototype-camera-off-time">--</strong></div>
-                    <div><span>Total observation time</span><strong id="prototype-observation-time">--</strong></div>
-                    <div><span>Zone 1 fan ON time</span><strong id="prototype-z1-fan-time">--</strong></div>
-                    <div><span>Zone 2 fan ON time</span><strong id="prototype-z2-fan-time">--</strong></div>
-                    <div><span>Zone 1 light ON time</span><strong id="prototype-z1-light-time">--</strong></div>
-                    <div><span>Zone 2 light ON time</span><strong id="prototype-z2-light-time">--</strong></div>
-                    <div><span>Vision Sense AI system power</span><strong>30 W <small>· 0.21 kWh/day at 7 h</small></strong></div>
-                  </div>
-                </div>
-              </div>
-              <div class="prototype-results">
-                <div class="subsection-label"><span>CONVENTIONAL CLASSROOM</span><span>2 fans + 2 lights · 7 hours</span></div>
-                <div class="prototype-metric"><span>Conventional Energy</span><strong id="prototype-conventional-energy">— <small>kWh/day</small></strong></div>
-                <div class="prototype-metric"><span>Smart Classroom Energy <small id="prototype-measured-basis">Waiting for automatic measurement</small></span><strong id="prototype-smart-energy">— <small>kWh/day</small></strong></div>
-                <div class="prototype-saving"><span>Energy Saved <small>Conventional energy minus Smart Classroom energy</small></span><strong id="prototype-energy-saved">— <small>kWh/day</small></strong><span class="saving-percent" id="prototype-saving-percent">— %</span></div>
-              </div>
-            </div>
-          </section>
-
-          <form class="calculator-form projection-form" id="energy-form" novalidate>
-            <div class="calculator-block-heading projection-heading">
-              <span class="calculator-step">02</span>
-              <div><span class="form-step">CLASSROOM PROJECTION</span><h3>Classroom Energy Projection</h3></div>
-            </div>
-            <p class="calculator-intro">Select equipment and classroom details. Smart fan and light operating time is projected from the measured prototype ON-time, and Vision Sense AI power is added separately to the smart energy total.</p>
-
-            <div class="selection-grid">
-              <section class="selection-card" aria-labelledby="fan-selection-title">
-                <div class="selection-heading"><span class="selection-icon" aria-hidden="true">✳</span><div><span class="form-step">EQUIPMENT 01</span><h4 id="fan-selection-title">Fan Selection</h4></div></div>
-                <label class="field"><span>Fan type</span><span class="select-wrap"><select id="fan-type" name="fanType">
-                  <option value="induction">Conventional Induction Fan</option>
-                  <option value="bldc">BLDC Fan</option>
-                  <option value="custom">Custom Fan</option>
-                </select></span></label>
-                <p class="equipment-range" id="fan-range">Typical range: 65–75 W · calculation value: 70 W</p>
-                <label class="field custom-power-field" id="custom-fan-field" hidden><span>Custom fan power</span><span class="input-wrap"><input id="custom-fan-power" name="customFanPower" type="number" min="0" step="any" placeholder="Enter rated watts" inputmode="decimal"><small>W</small></span></label>
-                <p class="selected-power">Selected rating <strong id="selected-fan-power">70 W</strong></p>
-              </section>
-              <section class="selection-card" aria-labelledby="light-selection-title">
-                <div class="selection-heading"><span class="selection-icon selection-icon-light" aria-hidden="true">☼</span><div><span class="form-step">EQUIPMENT 02</span><h4 id="light-selection-title">Light Selection</h4></div></div>
-                <label class="field"><span>Light type</span><span class="select-wrap"><select id="light-type" name="lightType">
-                  <option value="led-tube">LED Tube Light</option>
-                  <option value="led-bulb">LED Bulb</option>
-                  <option value="fluorescent">Fluorescent Tube Light</option>
-                  <option value="incandescent">Incandescent Bulb</option>
-                  <option value="custom">Custom Light</option>
-                </select></span></label>
-                <p class="equipment-range" id="light-range">Typical range: 18–22 W · calculation value: 20 W</p>
-                <label class="field custom-power-field" id="custom-light-field" hidden><span>Custom light power</span><span class="input-wrap"><input id="custom-light-power" name="customLightPower" type="number" min="0" step="any" placeholder="Enter rated watts" inputmode="decimal"><small>W</small></span></label>
-                <p class="selected-power">Selected rating <strong id="selected-light-power">20 W</strong></p>
-              </section>
-            </div>
-
-            <section class="classroom-details">
-              <div class="selection-heading"><span class="selection-icon details-icon" aria-hidden="true">⌂</span><div><span class="form-step">CLASSROOM DETAILS</span><h4>Set your projection</h4></div></div>
-              <div class="input-grid projection-inputs">
-                <label class="field"><span>Number of fans</span><span class="input-wrap"><input name="fans" type="number" min="0" step="1" value="2" placeholder="Enter quantity" required inputmode="numeric"><small>units</small></span></label>
-                <label class="field"><span>Number of lights</span><span class="input-wrap"><input name="lights" type="number" min="0" step="1" value="2" placeholder="Enter quantity" required inputmode="numeric"><small>units</small></span></label>
-                <label class="field"><span>School operating hours per day</span><span class="input-wrap"><input name="hours" type="number" min="0" max="24" step="any" value="7" required inputmode="decimal"><small>hours</small></span></label>
-                <label class="field"><span>Working days per month</span><span class="input-wrap"><input name="days" type="number" min="0" max="31" step="1" placeholder="Enter days" required inputmode="numeric"><small>days</small></span></label>
-                <label class="field field-rate"><span>Electricity tariff</span><span class="input-wrap"><input name="rate" type="number" min="0" step="any" placeholder="Enter tariff" required inputmode="decimal"><small>₹ / kWh</small></span></label>
-              </div>
-            </section>
-
-            <p class="form-error" id="form-error" role="alert" hidden></p>
-            <button class="button button-primary calculate-button" type="submit">Calculate classroom projection <span aria-hidden="true">↗</span></button>
-            <p class="projection-note">Classroom projections use measured prototype ON-time over the full observation period, selected equipment ratings, school hours, and the Vision Sense AI system power.</p>
-          </form>
-
-          <section class="projection-results" aria-label="Classroom projection results">
-            <div class="results-heading"><div><span class="form-step">ESTIMATED ENERGY USE</span><h3>Conventional Classroom Results</h3></div><span class="estimate-badge">CLASSROOM PROJECTION</span></div>
-            <div class="projection-result-grid">
-              <article class="projection-result-card"><span>Daily fan energy</span><strong id="conventional-fan-energy">— <small>kWh/day</small></strong></article>
-              <article class="projection-result-card"><span>Daily light energy</span><strong id="conventional-light-energy">— <small>kWh/day</small></strong></article>
-              <article class="projection-result-card projection-result-total"><span>Total conventional energy/day</span><strong id="conventional-daily">— <small>kWh/day</small></strong></article>
-            </div>
-            <div class="results-heading smart-results-heading"><div><span class="form-step">UTILIZATION-BASED ESTIMATE</span><h3>Smart Classroom Results</h3></div><span class="estimate-badge">ESTIMATED</span></div>
-            <div class="projection-result-grid smart-result-grid">
-              <article class="projection-result-card"><span>Smart fan energy/day</span><strong id="smart-fan-energy">— <small>kWh/day</small></strong><small class="result-support" id="smart-fan-time">Measured fan utilization required</small></article>
-              <article class="projection-result-card"><span>Smart light energy/day</span><strong id="smart-light-energy">— <small>kWh/day</small></strong><small class="result-support" id="smart-light-time">Measured light utilization required</small></article>
-              <article class="projection-result-card"><span>Vision Sense AI energy/day</span><strong id="smart-ai-energy">— <small>kWh/day</small></strong><small class="result-support" id="smart-ai-time">AI system power required</small></article>
-              <article class="projection-result-card projection-result-total"><span>Total smart classroom energy/day</span><strong id="smart-daily">— <small>kWh/day</small></strong></article>
-            </div>
-            <div class="results-heading savings-heading"><div><span class="form-step">ESTIMATED SAVINGS</span><h3>Energy Savings Results</h3></div></div>
-            <div class="savings-results">
-              <article class="savings-hero"><span>Estimated energy saved per day</span><strong id="daily-difference">— <small>kWh/day</small></strong><span id="energy-saving-percent">— % energy saving</span></article>
-              <div class="savings-secondary">
-                <article class="projection-result-card"><span>Estimated energy saved/month</span><strong id="monthly-difference">— <small>kWh/month</small></strong></article>
-                <article class="projection-result-card"><span>Estimated electricity cost saved/month</span><strong id="monthly-cost">—</strong></article>
-              </div>
-            </div>
-            <p class="estimate-disclaimer">Estimates compare calculated classroom projections—not measured classroom energy savings. Smart energy includes the fixed 30 W Vision Sense AI system power, calculated from the school operating-hours input (30 W × hours/day ÷ 1000).</p>
-          </section>
+        <div class="comparison-grid">
+          <article class="comparison-card comparison-conventional">
+            <div class="comparison-card-top"><span class="comparison-number">01</span><span class="comparison-label">CONVENTIONAL CLASSROOM</span></div>
+            <h3>Whole-room operation</h3>
+            <p>Fans and lights are typically switched on for the classroom as a whole, even when only part of the room is being used.</p>
+            <ul><li><strong>2 zones:</strong> both zones can be powered together.</li><li><strong>Occupancy:</strong> no zone-specific detection.</li><li><strong>Control:</strong> manual switching.</li><li><strong>Energy use:</strong> unused zones may continue consuming power.</li></ul>
+            <div class="comparison-flow"><span>Student in Zone 1</span><i>→</i><strong>Whole classroom powered</strong></div>
+          </article>
+          <article class="comparison-card comparison-smart">
+            <div class="comparison-card-top"><span class="comparison-number">02</span><span class="comparison-label">VISION SENSE AI</span></div>
+            <h3>Zone-aware operation</h3>
+            <p>The camera-based system identifies where a student is present and controls each zone independently.</p>
+            <ul><li><strong>2 zones:</strong> Zone 1 and Zone 2 are controlled separately.</li><li><strong>Occupancy:</strong> person detection determines the occupied zone.</li><li><strong>Temperature:</strong> fans respond to the DHT22 cooling condition.</li><li><strong>Energy use:</strong> only the required zone devices are operated.</li></ul>
+            <div class="comparison-flow"><span>Student in Zone 1</span><i>→</i><strong>Zone 1 fan + light ON</strong></div>
+          </article>
         </div>
+        <div class="comparison-bottom">
+          <div class="comparison-principle"><span class="comparison-principle-icon">✳</span><div><span>DESIGN PRINCIPLE</span><strong>Power the occupied zone, not the entire classroom.</strong></div></div>
+          <div class="comparison-points"><span><i></i> Zone-based control</span><span><i></i> Automatic occupancy detection</span><span><i></i> Temperature-aware fan control</span></div>
+        </div>
+        <p class="comparison-note">This is a system-design comparison, not a measured claim of a specific percentage of energy savings.</p>
       </div>
     </section>
 
