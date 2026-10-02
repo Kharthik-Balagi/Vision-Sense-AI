@@ -278,6 +278,7 @@ const liveRuntimeDevices = [
   { key: "zone2_light", device: "z2-light" },
 ];
 let latestLiveStatus = null;
+let latestMeasurement = null;
 
 async function refreshLiveStatus() {
   try {
@@ -287,6 +288,8 @@ async function refreshLiveStatus() {
     }
 
     latestLiveStatus = status;
+    latestMeasurement = updateAutomaticMeasurement(status);
+    renderAutomaticMeasurement(status, latestMeasurement);
     updateSystemConnection(status.connected);
     updateTemperatureStatus(status);
   } catch {
@@ -571,7 +574,10 @@ function updatePrototypeResults(utilization, fanPower, lightPower) {
     return;
   }
 
-  const conventional = (fanPower * utilization.observationHours + lightPower * utilization.observationHours) / 1000;
+  // Conventional comparison is a full classroom operating day.
+  // Smart energy is based only on device runtime measured in this fresh session.
+  const conventionalOperatingHours = 7;
+  const conventional = (fanPower * conventionalOperatingHours + lightPower * conventionalOperatingHours) / 1000;
   const smart = (fanPower * utilization.measuredFanHours + lightPower * utilization.measuredLightHours) / 1000;
   const saved = conventional - smart;
   const savingPercent = conventional > 0 ? (saved / conventional) * 100 : null;
@@ -583,7 +589,7 @@ function updatePrototypeResults(utilization, fanPower, lightPower) {
     ? "—"
     : `${savingPercent.toFixed(2)}% comparison`;
   basisElement.textContent =
-    `Smart energy from cumulative device runtime · Conventional energy uses total observation time`;
+    `Smart energy from this measurement session · Conventional energy assumes 7 h/day`;
 }
 
 function readRequiredNumber(name, label, options = {}) {
@@ -664,13 +670,17 @@ energyForm.addEventListener("submit", (event) => {
     return;
   }
 
-  const measurement = updateAutomaticMeasurement(latestLiveStatus);
+  if (!latestMeasurement) {
+    displayError("The measurement session has not started yet. Start the system and wait for live data.");
+    return;
+  }
+
   const utilization = {
-    fan: measurement.activeSeconds > 0
-      ? Math.min(1, (latestLiveStatus.zone1_fan_runtime + latestLiveStatus.zone2_fan_runtime) / (2 * measurement.activeSeconds))
+    fan: latestMeasurement.activeSeconds > 0
+      ? Math.min(1, (latestMeasurement.zone1FanSeconds + latestMeasurement.zone2FanSeconds) / (2 * latestMeasurement.activeSeconds))
       : 0,
-    light: measurement.activeSeconds > 0
-      ? Math.min(1, (latestLiveStatus.zone1_light_runtime + latestLiveStatus.zone2_light_runtime) / (2 * measurement.activeSeconds))
+    light: latestMeasurement.activeSeconds > 0
+      ? Math.min(1, (latestMeasurement.zone1LightSeconds + latestMeasurement.zone2LightSeconds) / (2 * latestMeasurement.activeSeconds))
       : 0,
   };
 
