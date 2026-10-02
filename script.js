@@ -208,6 +208,55 @@ async function controlVisionSense(action) {
 startSystemButton?.addEventListener("click", () => controlVisionSense("start"));
 stopSystemButton?.addEventListener("click", () => controlVisionSense("stop"));
 
+let websiteCloseHandled = false;
+
+function resetRuntimeDisplay() {
+  for (const { runtimeId, statusId } of Object.values(runtimeDevices)) {
+    const runtimeElement = document.getElementById(runtimeId);
+    const statusElement = document.getElementById(statusId);
+    if (runtimeElement) runtimeElement.textContent = "00:00:00";
+    if (statusElement) statusElement.textContent = "OFF";
+  }
+  const connectionElement = document.getElementById("system-connection-status");
+  if (connectionElement) {
+    connectionElement.textContent = "WEBSITE CLOSED — SYSTEM STOPPED";
+  }
+}
+
+function requestWebsiteCloseShutdown() {
+  if (websiteCloseHandled) return;
+  websiteCloseHandled = true;
+
+  resetRuntimeDisplay();
+
+  const url = "http://127.0.0.1:8765/shutdown_and_reset";
+  const payload = new Blob(["website-close"], { type: "text/plain" });
+
+  try {
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon(url, payload);
+      return;
+    }
+  } catch {
+    // Fall through to keepalive fetch.
+  }
+
+  try {
+    fetch(url, {
+      method: "POST",
+      body: payload,
+      cache: "no-store",
+      keepalive: true,
+    }).catch(() => {});
+  } catch {
+    // The page may already be unloading; there is nothing else to do here.
+  }
+}
+
+// Closing, refreshing, or navigating away from the website requests a clean
+// AI shutdown and clears the device runtime dashboard for the next session.
+window.addEventListener("pagehide", requestWebsiteCloseShutdown);
+
 const runtimeDevices = {
   "z1-fan": { runtimeId: "z1-fan-runtime", statusId: "z1-fan-status" },
   "z1-light": { runtimeId: "z1-light-runtime", statusId: "z1-light-status" },
