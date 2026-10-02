@@ -560,9 +560,9 @@ start_status_server()
 # START AI
 # =========================================================
 
-model = load_ai()
-
 cap = open_camera()
+
+model = load_ai()
 
 if cap is None:
 
@@ -1275,14 +1275,15 @@ try:
                         # LOAD YOLO
                         # ---------------------------------
 
-                        model = load_ai()
-
-
-                        # ---------------------------------
-                        # OPEN CAMERA
-                        # ---------------------------------
-
+                        # Open the camera first so the window appears immediately.
                         cap = open_camera()
+
+
+                        # ---------------------------------
+                        # LOAD YOLO
+                        # ---------------------------------
+
+                        model = load_ai()
 
 
                         if cap is None:
