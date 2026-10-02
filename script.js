@@ -445,6 +445,7 @@ let measurementState = {
   lastTimestamp: Date.now(),
   lastAiActive: false,
   initialized: false,
+  runtimeBaseline: null,
 };
 
 function saveMeasurementState() {
@@ -466,6 +467,7 @@ function loadMeasurementState() {
         lastTimestamp: saved.lastTimestamp,
         lastAiActive: saved.lastAiActive,
         initialized: true,
+        runtimeBaseline: null,
       };
     }
   } catch {
@@ -475,6 +477,18 @@ function loadMeasurementState() {
 
 function updateAutomaticMeasurement(status) {
   const now = Date.now();
+
+  // Device runtimes are cumulative, so establish a baseline when this browser
+  // measurement session begins. Historical runtime must not affect this test.
+  if (!measurementState.runtimeBaseline) {
+    measurementState.runtimeBaseline = {
+      zone1_fan: status.zone1_fan_runtime,
+      zone2_fan: status.zone2_fan_runtime,
+      zone1_light: status.zone1_light_runtime,
+      zone2_light: status.zone2_light_runtime,
+    };
+  }
+
   if (!measurementState.initialized) {
     measurementState.initialized = true;
     measurementState.lastTimestamp = now;
@@ -491,10 +505,15 @@ function updateAutomaticMeasurement(status) {
   }
 
   saveMeasurementState();
+
   return {
     activeSeconds: measurementState.activeSeconds,
     inactiveSeconds: measurementState.inactiveSeconds,
     observationSeconds: measurementState.activeSeconds + measurementState.inactiveSeconds,
+    zone1FanSeconds: Math.max(0, status.zone1_fan_runtime - measurementState.runtimeBaseline.zone1_fan),
+    zone2FanSeconds: Math.max(0, status.zone2_fan_runtime - measurementState.runtimeBaseline.zone2_fan),
+    zone1LightSeconds: Math.max(0, status.zone1_light_runtime - measurementState.runtimeBaseline.zone1_light),
+    zone2LightSeconds: Math.max(0, status.zone2_light_runtime - measurementState.runtimeBaseline.zone2_light),
   };
 }
 
@@ -503,15 +522,15 @@ function renderAutomaticMeasurement(status, measurement) {
     active: measurement.activeSeconds,
     inactive: measurement.inactiveSeconds,
     observation: measurement.observationSeconds,
-    zone1Fan: status.zone1_fan_runtime,
-    zone2Fan: status.zone2_fan_runtime,
-    zone1Light: status.zone1_light_runtime,
-    zone2Light: status.zone2_light_runtime,
+    zone1Fan: measurement.zone1FanSeconds,
+    zone2Fan: measurement.zone2FanSeconds,
+    zone1Light: measurement.zone1LightSeconds,
+    zone2Light: measurement.zone2LightSeconds,
     fanUtilization: measurement.activeSeconds > 0
-      ? Math.min(1, (status.zone1_fan_runtime + status.zone2_fan_runtime) / (2 * measurement.activeSeconds))
+      ? Math.min(1, (measurement.zone1FanSeconds + measurement.zone2FanSeconds) / (2 * measurement.activeSeconds))
       : 0,
     lightUtilization: measurement.activeSeconds > 0
-      ? Math.min(1, (status.zone1_light_runtime + status.zone2_light_runtime) / (2 * measurement.activeSeconds))
+      ? Math.min(1, (measurement.zone1LightSeconds + measurement.zone2LightSeconds) / (2 * measurement.activeSeconds))
       : 0,
   };
 
@@ -525,8 +544,8 @@ function renderAutomaticMeasurement(status, measurement) {
   updatePrototypeResults({
     fan: runtimeValues.fanUtilization,
     light: runtimeValues.lightUtilization,
-    measuredFanHours: (status.zone1_fan_runtime + status.zone2_fan_runtime) / 2 / 3600,
-    measuredLightHours: (status.zone1_light_runtime + status.zone2_light_runtime) / 2 / 3600,
+    measuredFanHours: (measurement.zone1FanSeconds + measurement.zone2FanSeconds) / 2 / 3600,
+    measuredLightHours: (measurement.zone1LightSeconds + measurement.zone2LightSeconds) / 2 / 3600,
     activeHours: measurement.activeSeconds / 3600,
     observationHours: measurement.observationSeconds / 3600,
   }, getSelectedPower(fanTypeInput, fanOptions, customFanPowerInput),
