@@ -1,4 +1,4 @@
-const CACHE_NAME = "vision-sense-ai-v1";
+const CACHE_NAME = "vision-sense-ai-v2";
 const APP_SHELL = [
   "./",
   "./index.html",
