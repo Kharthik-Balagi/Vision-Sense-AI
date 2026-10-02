@@ -191,6 +191,33 @@ function updateRuntime(device, seconds, isOn) {
   document.getElementById(elements.statusId).textContent = isOn ? "ON" : "OFF";
 }
 
+function updateTemperatureStatus(status) {
+  const readout = document.getElementById("live-temperature");
+  const sensorStatus = document.getElementById("temperature-sensor-status");
+  const fanCondition = document.getElementById("temperature-fan-condition");
+  const sensorNote = document.getElementById("temperature-sensor-note");
+
+  if (!readout || !sensorStatus || !fanCondition || !sensorNote) return;
+
+  const hasTemperature = status.temperature_valid === true
+    && Number.isFinite(status.temperature);
+
+  if (!hasTemperature) {
+    readout.textContent = "--";
+    sensorStatus.textContent = "AWAITING DATA";
+    fanCondition.textContent = "Waiting for sensor data";
+    sensorNote.textContent = "Waiting for live DHT22 temperature data from Arduino.";
+    return;
+  }
+
+  readout.textContent = status.temperature.toFixed(1);
+  sensorStatus.textContent = "LIVE";
+  fanCondition.textContent = status.cooling_allowed ? "FAN ALLOWED" : "FAN OFF";
+  sensorNote.textContent = status.cooling_allowed
+    ? "Temperature is above the 29°C cooling threshold."
+    : "Temperature is at or below the 29°C cooling threshold.";
+}
+
 function updateSystemConnection(isConnected) {
   if (typeof isConnected !== "boolean") {
     throw new TypeError("Connection status must be a boolean.");
@@ -218,6 +245,7 @@ async function refreshLiveStatus() {
 
     latestLiveStatus = status;
     updateSystemConnection(status.connected);
+    updateTemperatureStatus(status);
   } catch {
     latestLiveStatus = null;
     document.getElementById("system-connection-status").textContent = "WAITING FOR CONNECTION";
@@ -236,6 +264,14 @@ async function fetchCurrentStatus() {
   if (typeof status.connected !== "boolean") {
     throw new TypeError("Status response has no valid connection state.");
   }
+  if (status.temperature !== null && !Number.isFinite(status.temperature)) {
+    throw new TypeError("Status response has invalid temperature data.");
+  }
+  if (typeof status.temperature_valid !== "boolean"
+    || typeof status.cooling_allowed !== "boolean") {
+    throw new TypeError("Status response has invalid temperature state.");
+  }
+
   for (const { key } of liveRuntimeDevices) {
     if (typeof status[key] !== "boolean"
       || !Number.isFinite(status[`${key}_runtime`])
