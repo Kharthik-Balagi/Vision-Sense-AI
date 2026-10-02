@@ -43,12 +43,17 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline: 3px solid 
 .hero h1 { margin-bottom: 21px; color: #ffffff; font: 800 clamp(39px, 4.3vw, 56px)/1.14 var(--font-display); letter-spacing: -.055em; }
 .hero h1 span, h2 span { color: var(--mint); }
 .hero-subtitle { max-width: 415px; margin-bottom: 29px; color: #a7b7ba; font-size: 15px; line-height: 1.8; }
-.hero-actions { display: flex; align-items: center; gap: 23px; }
+.hero-actions { display: grid; gap: 12px; }
+.system-control-buttons { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.system-control-button { min-height: 49px; }
+.system-control-button:disabled { cursor: not-allowed; opacity: .42; transform: none; box-shadow: none; }
+.hero-actions .button-secondary { border-color: rgba(255,255,255,.25); color: #e8efeb; background: rgba(255,255,255,.055); }
+.hero-actions .button-secondary:hover:not(:disabled) { background: rgba(255,255,255,.12); }
 .button { display: inline-flex; justify-content: center; align-items: center; gap: 22px; min-height: 49px; padding: 0 20px; border: 0; border-radius: 4px; font-size: 12px; font-weight: 700; transition: transform .2s ease, background .2s ease, box-shadow .2s ease; cursor: pointer; }
 .button:hover { transform: translateY(-2px); box-shadow: 0 9px 24px rgba(0,0,0,.13); }
 .button-primary { color: var(--ink-deep); background: var(--mint); }
 .button-primary:hover { background: #8BFFD8; }
-.hero-caption { color: #97a9ad; font-size: 10px; }
+.hero-caption { color: #97a9ad; font-size: 10px; line-height: 1.5; }
 .hero-caption .pulse-dot { width: 5px; height: 5px; margin-right: 7px; }
 .hero-stats { display: flex; gap: 36px; margin-top: 48px; padding-top: 23px; border-top: 1px solid rgba(205,221,216,.14); }
 .hero-stats div { display: grid; gap: 5px; }
