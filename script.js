@@ -586,6 +586,8 @@ function loadMeasurementState() {
     inactiveSeconds: 0,
     lastTimestamp: 0,
     lastAiActive: false,
+    lastPersonDetected: false,
+    lastCameraOff: false,
     initialized: false,
     running: false,
     liveStarted: false,
@@ -599,6 +601,8 @@ function startMeasurementSession(status = null) {
     inactiveSeconds: 0,
     lastTimestamp: 0,
     lastAiActive: false,
+    lastPersonDetected: false,
+    lastCameraOff: false,
     initialized: false,
     running: true,
     liveStarted: false,
@@ -654,11 +658,6 @@ function updateAutomaticMeasurement(status) {
     // inflating the observation total.
     const personDetected = status.zone1 === true || status.zone2 === true;
     const cameraOff = status.ai_active !== true;
-
-    if (measurementState.lastAiActive === true) {
-      // lastAiActive is retained for compatibility, but the actual active
-      // period is determined from the previous zone occupancy state below.
-    }
 
     if (measurementState.lastPersonDetected === true) {
       measurementState.activeSeconds += elapsed;
