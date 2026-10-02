@@ -107,7 +107,7 @@
               <span class="calculator-step">01</span>
               <div><span class="form-step">MEASURED PROTOTYPE DATA</span><h3 id="prototype-title">Prototype Energy Comparison</h3></div>
             </div>
-            <p class="calculator-intro">Measurement starts only after START SYSTEM is clicked. Active and camera-off time are measured in that fresh session and freeze when STOP SYSTEM is clicked. Vision Sense AI system power is fixed at 30 W for this project.</p>
+            <p class="calculator-intro">Measurement starts only after START SYSTEM is clicked. Active and camera-off time are measured in that fresh session and freeze when STOP SYSTEM is clicked. The prototype comparison uses the same two-zone classroom: 2 conventional fans + 2 conventional lights versus the measured Zone 1 + Zone 2 smart runtime, plus 30 W of Vision Sense AI system power.</p>
             <div class="measurement-layout">
               <div class="measurement-controls">
                 <div class="live-measurements">
@@ -126,7 +126,7 @@
                 </div>
               </div>
               <div class="prototype-results">
-                <div class="subsection-label"><span>CONVENTIONAL CLASSROOM</span><span>1 fan + 1 light · 7 hours</span></div>
+                <div class="subsection-label"><span>CONVENTIONAL CLASSROOM</span><span>2 fans + 2 lights · 7 hours</span></div>
                 <div class="prototype-metric"><span>Conventional Energy</span><strong id="prototype-conventional-energy">— <small>kWh/day</small></strong></div>
                 <div class="prototype-metric"><span>Smart Classroom Energy <small id="prototype-measured-basis">Waiting for automatic measurement</small></span><strong id="prototype-smart-energy">— <small>kWh/day</small></strong></div>
                 <div class="prototype-saving"><span>Energy Saved <small>Conventional energy minus Smart Classroom energy</small></span><strong id="prototype-energy-saved">— <small>kWh/day</small></strong><span class="saving-percent" id="prototype-saving-percent">— %</span></div>
@@ -171,8 +171,8 @@
             <section class="classroom-details">
               <div class="selection-heading"><span class="selection-icon details-icon" aria-hidden="true">⌂</span><div><span class="form-step">CLASSROOM DETAILS</span><h4>Set your projection</h4></div></div>
               <div class="input-grid projection-inputs">
-                <label class="field"><span>Number of fans</span><span class="input-wrap"><input name="fans" type="number" min="0" step="1" placeholder="Enter quantity" required inputmode="numeric"><small>units</small></span></label>
-                <label class="field"><span>Number of lights</span><span class="input-wrap"><input name="lights" type="number" min="0" step="1" placeholder="Enter quantity" required inputmode="numeric"><small>units</small></span></label>
+                <label class="field"><span>Number of fans</span><span class="input-wrap"><input name="fans" type="number" min="0" step="1" value="2" placeholder="Enter quantity" required inputmode="numeric"><small>units</small></span></label>
+                <label class="field"><span>Number of lights</span><span class="input-wrap"><input name="lights" type="number" min="0" step="1" value="2" placeholder="Enter quantity" required inputmode="numeric"><small>units</small></span></label>
                 <label class="field"><span>School operating hours per day</span><span class="input-wrap"><input name="hours" type="number" min="0" max="24" step="any" value="7" required inputmode="decimal"><small>hours</small></span></label>
                 <label class="field"><span>Working days per month</span><span class="input-wrap"><input name="days" type="number" min="0" max="31" step="1" placeholder="Enter days" required inputmode="numeric"><small>days</small></span></label>
                 <label class="field field-rate"><span>Electricity tariff</span><span class="input-wrap"><input name="rate" type="number" min="0" step="any" placeholder="Enter tariff" required inputmode="decimal"><small>₹ / kWh</small></span></label>
@@ -206,7 +206,7 @@
                 <article class="projection-result-card"><span>Estimated electricity cost saved/month</span><strong id="monthly-cost">—</strong></article>
               </div>
             </div>
-            <p class="estimate-disclaimer">Estimates compare calculated classroom projections—not measured classroom energy savings. Smart energy includes the fixed 30 W Vision Sense AI system power (0.21 kWh/day at 7 hours).</p>
+            <p class="estimate-disclaimer">Estimates compare calculated classroom projections—not measured classroom energy savings. Smart energy includes the fixed 30 W Vision Sense AI system power, calculated from the school operating-hours input (30 W × hours/day ÷ 1000).</p>
           </section>
         </div>
       </div>
