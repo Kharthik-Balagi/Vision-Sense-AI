@@ -33,7 +33,6 @@
     <nav class="main-nav" aria-label="Main navigation">
       <a href="#temperature">Temperature</a>
       <a href="#comparison">Comparison</a>
-      <a href="#runtime">Device data</a>
     </nav>
     <a class="header-link" href="#comparison">See the comparison <span aria-hidden="true">↗</span></a>
   </header>
@@ -122,50 +121,6 @@
           <div class="comparison-points"><span><i></i> Zone-based control</span><span><i></i> Automatic occupancy detection</span><span><i></i> Temperature-aware fan control</span></div>
         </div>
         <p class="comparison-note">This is a system-design comparison, not a measured claim of a specific percentage of energy savings.</p>
-      </div>
-    </section>
-
-    <section class="data-section" id="runtime">
-      <div class="section-shell section-pad">
-        <div class="section-heading">
-          <div><p class="eyebrow eyebrow-dark">DEVICE DASHBOARD</p><h2>Device Operating <span>Time</span></h2></div>
-          <span class="ready-badge"><i></i> READY FOR LIVE DATA</span>
-        </div>
-        <div class="system-status" aria-live="polite">
-          <span class="system-status-label">SYSTEM STATUS</span>
-          <span class="system-status-value">Status: <strong id="system-connection-status">Waiting for connection</strong></span>
-        </div>
-        <div class="runtime-grid">
-          <article class="runtime-card">
-            <span class="runtime-symbol" aria-hidden="true">✳</span>
-            <span class="runtime-label">Zone 01 / Fan</span>
-            <strong class="runtime-value" id="z1-fan-runtime">--:--:--</strong>
-            <span class="runtime-status">Status: <strong id="z1-fan-status">OFF</strong></span>
-            <span class="runtime-caption">Waiting for live data</span>
-          </article>
-          <article class="runtime-card">
-            <span class="runtime-symbol" aria-hidden="true">☼</span>
-            <span class="runtime-label">Zone 01 / Light</span>
-            <strong class="runtime-value" id="z1-light-runtime">--:--:--</strong>
-            <span class="runtime-status">Status: <strong id="z1-light-status">OFF</strong></span>
-            <span class="runtime-caption">Waiting for live data</span>
-          </article>
-          <article class="runtime-card">
-            <span class="runtime-symbol" aria-hidden="true">✳</span>
-            <span class="runtime-label">Zone 02 / Fan</span>
-            <strong class="runtime-value" id="z2-fan-runtime">--:--:--</strong>
-            <span class="runtime-status">Status: <strong id="z2-fan-status">OFF</strong></span>
-            <span class="runtime-caption">Waiting for live data</span>
-          </article>
-          <article class="runtime-card">
-            <span class="runtime-symbol" aria-hidden="true">☼</span>
-            <span class="runtime-label">Zone 02 / Light</span>
-            <strong class="runtime-value" id="z2-light-runtime">--:--:--</strong>
-            <span class="runtime-status">Status: <strong id="z2-light-status">OFF</strong></span>
-            <span class="runtime-caption">Waiting for live data</span>
-          </article>
-        </div>
-        <p class="future-note"><span aria-hidden="true">↗</span> Connect the Arduino Nano and run the Python control system to see live operating-time data here.</p>
       </div>
     </section>
 
