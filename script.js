@@ -290,6 +290,9 @@ async function refreshLiveStatus() {
     latestLiveStatus = status;
     updateSystemConnection(status.connected);
     updateTemperatureStatus(status);
+
+    const measurement = updateAutomaticMeasurement(status);
+    renderAutomaticMeasurement(status, measurement);
   } catch {
     latestLiveStatus = null;
     document.getElementById("system-connection-status").textContent = "WAITING FOR CONNECTION";
@@ -305,7 +308,7 @@ async function fetchCurrentStatus() {
   }
 
   const status = await response.json();
-  if (typeof status.connected !== "boolean") {
+  if (typeof status.connected !== "boolean" || typeof status.ai_active !== "boolean") {
     throw new TypeError("Status response has no valid connection state.");
   }
   if (status.temperature !== null && !Number.isFinite(status.temperature)) {
@@ -568,7 +571,7 @@ function updatePrototypeResults(utilization, fanPower, lightPower) {
     `Smart energy from cumulative device runtime · Conventional energy uses total observation time`;
 }
 
-function readRequiredNumber(name, label, options = {}) {(name, label, options = {}) {
+function readRequiredNumber(name, label, options = {}) {
   const input = document.querySelector(`[name="${name}"]`);
   const value = Number(input.value);
   if (input.value.trim() === "" || !Number.isFinite(value) || value < (options.min ?? 0)) {
@@ -1238,21 +1241,14 @@ energyForm.addEventListener("submit", (event) => {
   event.preventDefault();
   formError.hidden = true;
 
-  const utilization = getPrototypeUtilization();
-  if (!utilization) return;
-
-  const fanPower = fanTypeInput.value === "custom"
-    ? Number(customFanPowerInput.value)
-    : fanOptions[fanTypeInput.value]?.watts;
-  if (!Number.isFinite(fanPower) || fanPower < 0 || customFanPowerInput.value.trim() === "" && fanTypeInput.value === "custom") {
+  const fanPower = getSelectedPower(fanTypeInput, fanOptions, customFanPowerInput);
+  if (!Number.isFinite(fanPower) || fanPower < 0) {
     displayError("Enter a valid custom fan wattage.", customFanPowerInput);
     return;
   }
 
-  const lightPower = lightTypeInput.value === "custom"
-    ? Number(customLightPowerInput.value)
-    : lightOptions[lightTypeInput.value]?.watts;
-  if (!Number.isFinite(lightPower) || lightPower < 0 || customLightPowerInput.value.trim() === "" && lightTypeInput.value === "custom") {
+  const lightPower = getSelectedPower(lightTypeInput, lightOptions, customLightPowerInput);
+  if (!Number.isFinite(lightPower) || lightPower < 0) {
     displayError("Enter a valid custom light wattage.", customLightPowerInput);
     return;
   }
@@ -1266,8 +1262,23 @@ energyForm.addEventListener("submit", (event) => {
   };
   if (Object.values(values).some((value) => value === null)) return;
 
-  updatePrototypeResults(utilization, fanPower, lightPower);
+  if (!latestLiveStatus) {
+    displayError("Connect the live system first so the automatic prototype measurement can be used.");
+    return;
+  }
+
+  const measurement = updateAutomaticMeasurement(latestLiveStatus);
+  const utilization = {
+    fan: measurement.activeSeconds > 0
+      ? Math.min(1, (latestLiveStatus.zone1_fan_runtime + latestLiveStatus.zone2_fan_runtime) / (2 * measurement.activeSeconds))
+      : 0,
+    light: measurement.activeSeconds > 0
+      ? Math.min(1, (latestLiveStatus.zone1_light_runtime + latestLiveStatus.zone2_light_runtime) / (2 * measurement.activeSeconds))
+      : 0,
+  };
+
   updateProjectionResults(values, utilization, fanPower, lightPower);
 });
 
-loadMeasurementState();\nrefreshLiveStatus();
+loadMeasurementState();
+refreshLiveStatus();
