@@ -286,7 +286,6 @@ async function refreshLiveStatus() {
     for (const { key, device } of liveRuntimeDevices) {
       updateRuntime(device, status[`${key}_runtime`], status[key]);
     }
-
     latestLiveStatus = status;
     updateSystemConnection(status.connected);
     updateTemperatureStatus(status);
@@ -926,7 +925,7 @@ async function fetchCurrentStatus() {
   }
 
   const status = await response.json();
-  if (typeof status.connected !== "boolean") {
+  if (typeof status.connected !== "boolean" || typeof status.ai_active !== "boolean") {
     throw new TypeError("Status response has no valid connection state.");
   }
   if (status.temperature !== null && !Number.isFinite(status.temperature)) {
