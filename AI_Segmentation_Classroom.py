@@ -110,6 +110,7 @@ def try_connect_arduino():
 # =========================================================
 
 def send_command(command):
+    global arduino
 
     if not try_connect_arduino():
         update_runtime_state(connected=False)
