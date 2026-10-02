@@ -3,6 +3,8 @@ import os
 import signal
 import subprocess
 import sys
+import urllib.error
+import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -48,23 +50,49 @@ def start_ai():
 
 def stop_ai():
     global process
+
     if not process_running():
         return {"ok": True, "message": "Vision Sense AI is already stopped."}
 
-    if os.name == "nt":
-        try:
-            process.send_signal(signal.CTRL_BREAK_EVENT)
-        except (AttributeError, OSError):
-            process.terminate()
-    else:
-        process.send_signal(signal.SIGINT)
+    # Ask the Python AI to shut itself down so its finally block can safely
+    # switch outputs off, close the camera, save runtime data and close Arduino.
+    try:
+        request = urllib.request.Request(
+            "http://127.0.0.1:8765/shutdown",
+            method="POST"
+        )
+        with urllib.request.urlopen(request, timeout=2) as response:
+            response.read()
+    except (urllib.error.URLError, OSError):
+        # Fall back to the Windows process-group signal below.
+        pass
 
     try:
         process.wait(timeout=8)
     except subprocess.TimeoutExpired:
-        process.terminate()
+        # Last-resort fallback if the cooperative request could not stop it.
+        if os.name == "nt":
+            try:
+                process.send_signal(signal.CTRL_BREAK_EVENT)
+            except (AttributeError, OSError):
+                pass
+        else:
+            try:
+                process.send_signal(signal.SIGINT)
+            except OSError:
+                pass
 
-    return {"ok": True, "message": "Vision Sense AI stop requested."}
+        try:
+            process.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            process.terminate()
+            try:
+                process.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                process.kill()
+
+    process = None
+    return {"ok": True, "message": "Vision Sense AI stopped safely."}
 
 
 class Handler(BaseHTTPRequestHandler):
