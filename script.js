@@ -158,6 +158,50 @@ if (backgroundCanvas && backgroundContext) {
   updateBackgroundMotion();
 }
 
+
+const startSystemButton = document.getElementById("start-system");
+const stopSystemButton = document.getElementById("stop-system");
+const systemControlStatus = document.getElementById("system-control-status");
+
+async function controlVisionSense(action) {
+  if (!startSystemButton || !stopSystemButton || !systemControlStatus) return;
+
+  const isStarting = action === "start";
+  startSystemButton.disabled = true;
+  stopSystemButton.disabled = true;
+  systemControlStatus.innerHTML = '<span class="pulse-dot"></span> ' + (isStarting
+    ? "Starting Vision Sense AI..."
+    : "Stopping Vision Sense AI...");
+
+  try {
+    const response = await fetch(`http://127.0.0.1:8766/${action}`, {
+      method: "POST",
+      cache: "no-store",
+    });
+    const result = await response.json();
+    if (!response.ok || result.ok !== true) {
+      throw new Error(result.message || "Local controller rejected the request.");
+    }
+
+    systemControlStatus.innerHTML = '<span class="pulse-dot"></span> ' + (
+      isStarting
+        ? "Vision Sense AI starting — camera and YOLO will appear on the laptop."
+        : "Vision Sense AI stopped safely."
+    );
+    startSystemButton.disabled = isStarting;
+    stopSystemButton.disabled = !isStarting;
+  } catch (error) {
+    systemControlStatus.innerHTML = '<span class="pulse-dot"></span> ' + (
+      "Local controller not running. Start vision_sense_launcher.py on this laptop."
+    );
+    startSystemButton.disabled = false;
+    stopSystemButton.disabled = true;
+  }
+}
+
+startSystemButton?.addEventListener("click", () => controlVisionSense("start"));
+stopSystemButton?.addEventListener("click", () => controlVisionSense("stop"));
+
 const runtimeDevices = {
   "z1-fan": { runtimeId: "z1-fan-runtime", statusId: "z1-fan-status" },
   "z1-light": { runtimeId: "z1-light-runtime", statusId: "z1-light-status" },
