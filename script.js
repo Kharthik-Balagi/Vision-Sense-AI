@@ -588,3 +588,13 @@ function renderAutomaticMeasurement(status, measurement) {
 
 loadMeasurementState();
 refreshLiveStatus();
+
+// PWA registration
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./service-worker.js", { scope: "./" })
+      .catch(() => {
+        // The website remains fully usable when service-worker registration is unavailable.
+      });
+  });
+}
