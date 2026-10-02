@@ -107,22 +107,20 @@
               <span class="calculator-step">01</span>
               <div><span class="form-step">MEASURED PROTOTYPE DATA</span><h3 id="prototype-title">Prototype Energy Comparison</h3></div>
             </div>
-            <p class="calculator-intro">Prototype Measurement is captured from live runtime counters. Start and stop a measurement to calculate actual zone operating times; Classroom Projection estimates a school day using the measured utilization.</p>
+            <p class="calculator-intro">Prototype Measurement is captured automatically from the live system. When the camera/AI is active, active time accumulates; when the camera is off, that time is tracked separately. The energy comparison updates automatically.</p>
             <div class="measurement-layout">
               <div class="measurement-controls">
                 <div class="live-measurements">
-                  <p class="form-hint">Start records the current cumulative counters as a temporary baseline. Stop calculates only the new runtime since Start. Counters are never reset or changed.</p>
-                  <div class="measurement-actions">
-                    <button class="button button-primary" id="start-measurement" type="button">Start Measurement</button>
-                    <button class="button button-secondary" id="stop-measurement" type="button" disabled>Stop Measurement</button>
-                  </div>
+                  <p class="form-hint">Automatic measurement: active time starts when the camera/AI becomes active, pauses when the camera turns off, and resumes automatically when the system starts again. The accumulated values are retained in this browser.</p>
                   <p class="measurement-status" id="measurement-status" aria-live="polite">Waiting for a connection to the local status server.</p>
                   <div class="measurement-readouts" aria-live="polite">
-                    <div><span>Measurement duration</span><strong id="prototype-duration">--:--:--</strong></div>
-                    <div><span>Zone 1 fan ON time</span><strong id="prototype-z1-fan-time">--:--:--</strong></div>
-                    <div><span>Zone 2 fan ON time</span><strong id="prototype-z2-fan-time">--:--:--</strong></div>
-                    <div><span>Zone 1 light ON time</span><strong id="prototype-z1-light-time">--:--:--</strong></div>
-                    <div><span>Zone 2 light ON time</span><strong id="prototype-z2-light-time">--:--:--</strong></div>
+                    <div><span>Camera / AI active time</span><strong id="prototype-active-time">--</strong></div>
+                    <div><span>Camera-off time</span><strong id="prototype-camera-off-time">--</strong></div>
+                    <div><span>Total observation time</span><strong id="prototype-observation-time">--</strong></div>
+                    <div><span>Zone 1 fan ON time</span><strong id="prototype-z1-fan-time">--</strong></div>
+                    <div><span>Zone 2 fan ON time</span><strong id="prototype-z2-fan-time">--</strong></div>
+                    <div><span>Zone 1 light ON time</span><strong id="prototype-z1-light-time">--</strong></div>
+                    <div><span>Zone 2 light ON time</span><strong id="prototype-z2-light-time">--</strong></div>
                     <div><span>Overall fan utilization</span><strong id="prototype-fan-utilization">--%</strong></div>
                     <div><span>Overall light utilization</span><strong id="prototype-light-utilization">--%</strong></div>
                   </div>
@@ -131,7 +129,7 @@
               <div class="prototype-results">
                 <div class="subsection-label"><span>CONVENTIONAL CLASSROOM</span><span>1 fan + 1 light · 7 hours</span></div>
                 <div class="prototype-metric"><span>Conventional Energy</span><strong id="prototype-conventional-energy">— <small>kWh/day</small></strong></div>
-                <div class="prototype-metric"><span>Smart Classroom Energy <small id="prototype-measured-basis">Start and stop a live measurement</small></span><strong id="prototype-smart-energy">— <small>kWh/day</small></strong></div>
+                <div class="prototype-metric"><span>Smart Classroom Energy <small id="prototype-measured-basis">Waiting for automatic measurement</small></span><strong id="prototype-smart-energy">— <small>kWh/day</small></strong></div>
                 <div class="prototype-saving"><span>Energy Saved <small>Estimated from prototype utilization</small></span><strong id="prototype-energy-saved">— <small>kWh/day</small></strong><span class="saving-percent" id="prototype-saving-percent">— %</span></div>
               </div>
             </div>
