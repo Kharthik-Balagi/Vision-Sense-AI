@@ -10,6 +10,7 @@ from pathlib import Path
 
 HOST = "127.0.0.1"
 PORT = 8766
+AI_STATUS_URL = "http://127.0.0.1:8765"
 SCRIPT_PATH = Path(__file__).resolve().with_name("AI_Segmentation_Classroom.py")
 
 process = None
@@ -35,6 +36,16 @@ def process_running():
     return process is not None and process.poll() is None
 
 
+def request_ai_shutdown():
+    """Ask the AI process to run its own safe shutdown, even if launched separately."""
+    request = urllib.request.Request(
+        f"{AI_STATUS_URL}/shutdown",
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=2) as response:
+        response.read()
+
+
 def start_ai():
     global process
     if process_running():
@@ -51,48 +62,58 @@ def start_ai():
 def stop_ai():
     global process
 
-    if not process_running():
-        return {"ok": True, "message": "Vision Sense AI is already stopped."}
-
-    # Ask the Python AI to shut itself down so its finally block can safely
-    # switch outputs off, close the camera, save runtime data and close Arduino.
+    # Always try the AI's cooperative shutdown endpoint first. This also
+    # works when the AI was started directly instead of by this launcher.
+    ai_shutdown_requested = False
     try:
-        request = urllib.request.Request(
-            "http://127.0.0.1:8765/shutdown",
-            method="POST"
-        )
-        with urllib.request.urlopen(request, timeout=2) as response:
-            response.read()
+        request_ai_shutdown()
+        ai_shutdown_requested = True
     except (urllib.error.URLError, OSError):
-        # Fall back to the Windows process-group signal below.
         pass
 
-    try:
-        process.wait(timeout=8)
-    except subprocess.TimeoutExpired:
-        # Last-resort fallback if the cooperative request could not stop it.
-        if os.name == "nt":
-            try:
-                process.send_signal(signal.CTRL_BREAK_EVENT)
-            except (AttributeError, OSError):
-                pass
-        else:
-            try:
-                process.send_signal(signal.SIGINT)
-            except OSError:
-                pass
-
+    if process_running():
         try:
-            process.wait(timeout=3)
+            process.wait(timeout=8)
         except subprocess.TimeoutExpired:
-            process.terminate()
+            if os.name == "nt":
+                try:
+                    process.send_signal(signal.CTRL_BREAK_EVENT)
+                except (AttributeError, OSError):
+                    pass
+            else:
+                try:
+                    process.send_signal(signal.SIGINT)
+                except OSError:
+                    pass
+
             try:
                 process.wait(timeout=3)
             except subprocess.TimeoutExpired:
-                process.kill()
+                process.terminate()
+                try:
+                    process.wait(timeout=3)
+                except subprocess.TimeoutExpired:
+                    process.kill()
 
-    process = None
-    return {"ok": True, "message": "Vision Sense AI stopped safely."}
+        process = None
+
+        return {
+            "ok": True,
+            "message": "Vision Sense AI stopped safely."
+            if ai_shutdown_requested
+            else "Vision Sense AI process stopped."
+        }
+
+    if ai_shutdown_requested:
+        return {
+            "ok": True,
+            "message": "Vision Sense AI shutdown requested successfully."
+        }
+
+    return {
+        "ok": True,
+        "message": "Vision Sense AI is already stopped."
+    }
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -123,4 +144,3 @@ if __name__ == "__main__":
     print("Controller: http://127.0.0.1:8766")
     print("======================================")
     ThreadingHTTPServer((HOST, PORT), Handler).serve_forever()
-
