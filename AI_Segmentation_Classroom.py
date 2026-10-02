@@ -40,6 +40,12 @@ HEARTBEAT_INTERVAL = 0.5
 # camera and YOLO go to standby
 NO_PERSON_TIME = 3
 
+# Camera/AI performance settings
+CAMERA_WIDTH = 640
+CAMERA_HEIGHT = 480
+CAMERA_FPS = 30
+YOLO_IMGSZ = 416
+
 # Ignore tiny false detections
 MIN_PERSON_PIXELS = 1000
 
@@ -194,7 +200,7 @@ def open_camera():
 
     print("Opening camera...")
 
-    camera = cv2.VideoCapture(CAMERA_INDEX)
+    camera = cv2.VideoCapture(CAMERA_INDEX, cv2.CAP_DSHOW) if os.name == "nt" else cv2.VideoCapture(CAMERA_INDEX)
 
     if not camera.isOpened():
 
@@ -204,7 +210,10 @@ def open_camera():
 
         return None
 
-    time.sleep(0.5)
+    camera.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH)
+    camera.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT)
+    camera.set(cv2.CAP_PROP_FPS, CAMERA_FPS)
+    camera.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
     print("Camera ON.")
 
@@ -239,6 +248,13 @@ def load_ai():
     print("Loading YOLO11...")
 
     model = YOLO(MODEL_PATH)
+
+    # Warm up the model once so the first live detection is not delayed.
+    try:
+        dummy = __import__("numpy").zeros((YOLO_IMGSZ, YOLO_IMGSZ, 3), dtype="uint8")
+        model.predict(dummy, imgsz=YOLO_IMGSZ, conf=CONFIDENCE, classes=[0], verbose=False)
+    except Exception as error:
+        print(f"YOLO warm-up skipped: {error}")
 
     print("YOLO11 READY.")
 
@@ -648,6 +664,7 @@ try:
                 frame,
                 conf=CONFIDENCE,
                 classes=[0],
+                imgsz=YOLO_IMGSZ,
                 verbose=False
             )
 
