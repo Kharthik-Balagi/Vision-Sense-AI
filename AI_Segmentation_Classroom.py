@@ -309,6 +309,7 @@ zone2_fan_state = False
 # LOCAL WEBSITE STATUS
 status_lock = threading.Lock()
 status_server = None
+shutdown_requested = threading.Event()
 zone1_state = False
 zone2_state = False
 runtime_data_path = Path(__file__).resolve().with_name("runtime_data.json")
@@ -518,6 +519,26 @@ class WebsiteStatusHandler(BaseHTTPRequestHandler):
         self.send_response(204)
         self.send_cors_headers()
         self.end_headers()
+
+    def do_POST(self):
+        if urlsplit(self.path).path == "/shutdown":
+            shutdown_requested.set()
+            body = b"{\"ok\":true,\"message\":\"Shutdown requested.\"}"
+            self.send_response(200)
+            self.send_cors_headers()
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        body = b"Not found"
+        self.send_response(404)
+        self.send_cors_headers()
+        self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def do_GET(self):
 
@@ -1280,6 +1301,9 @@ try:
         # =================================================
 
         else:
+
+            if shutdown_requested.is_set():
+                break
 
             try:
 
