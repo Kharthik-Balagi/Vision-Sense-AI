@@ -145,6 +145,11 @@ def read_arduino_messages():
                     current_temperature = value
                     last_temperature_time = time.time()
 
+                    with status_lock:
+                        website_status["temperature"] = value
+                        website_status["temperature_valid"] = True
+                        website_status["cooling_allowed"] = value > TEMPERATURE_THRESHOLD
+
                 except ValueError:
                     pass
 
@@ -287,6 +292,9 @@ website_status = {
     "zone1_light": False,
     "zone2_fan": False,
     "zone2_light": False,
+    "temperature": None,
+    "temperature_valid": False,
+    "cooling_allowed": False,
 }
 
 
@@ -437,6 +445,18 @@ def get_website_status():
 
     with status_lock:
         snapshot = dict(website_status)
+
+        temperature_is_valid = (
+            current_temperature is not None
+            and time.time() - last_temperature_time <= TEMPERATURE_TIMEOUT
+        )
+        snapshot["temperature_valid"] = temperature_is_valid
+        snapshot["temperature"] = current_temperature if temperature_is_valid else None
+        snapshot["cooling_allowed"] = (
+            bool(current_temperature > TEMPERATURE_THRESHOLD)
+            if temperature_is_valid
+            else False
+        )
 
         for device, accumulated in runtime_totals.items():
             started_at = runtime_started_at[device]
