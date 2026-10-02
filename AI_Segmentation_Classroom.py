@@ -64,20 +64,45 @@ TEMPERATURE_TIMEOUT = 5
 # ARDUINO CONNECTION
 # =========================================================
 
-print("Connecting to Arduino...")
+arduino = None
+last_serial_attempt = 0.0
+SERIAL_RETRY_INTERVAL = 2.0
 
-arduino = serial.Serial(
-    SERIAL_PORT,
-    BAUD_RATE,
-    timeout=0.05,
-    write_timeout=2
-)
 
-time.sleep(2)
+# =========================================================
+# ARDUINO CONNECTION
+# =========================================================
+def try_connect_arduino():
+    global arduino, last_serial_attempt
 
-arduino.reset_input_buffer()
+    now = time.time()
+    if arduino is not None and arduino.is_open:
+        return True
 
-print("Arduino connected.")
+    if now - last_serial_attempt < SERIAL_RETRY_INTERVAL:
+        return False
+
+    last_serial_attempt = now
+
+    try:
+        print("Connecting to Arduino...")
+        candidate = serial.Serial(
+            SERIAL_PORT,
+            BAUD_RATE,
+            timeout=0.05,
+            write_timeout=2
+        )
+        time.sleep(2)
+        candidate.reset_input_buffer()
+        arduino = candidate
+        update_runtime_state(connected=True)
+        print("Arduino connected.")
+        return True
+    except (serial.SerialException, OSError) as error:
+        arduino = None
+        update_runtime_state(connected=False)
+        print(f"Arduino not connected — check USB cable ({error})")
+        return False
 
 
 # =========================================================
@@ -86,26 +111,30 @@ print("Arduino connected.")
 
 def send_command(command):
 
-    try:
+    if not try_connect_arduino():
+        update_runtime_state(connected=False)
+        return False
 
+    try:
         arduino.write(
             (command + "\n").encode()
         )
-
         arduino.flush()
 
         print("Arduino:", command)
-
         update_runtime_state(connected=True)
-
         return True
 
-    except serial.SerialException as e:
-
-        print("Serial error:", e)
-
+    except (serial.SerialException, OSError) as error:
+        print("Serial error — Arduino USB may be disconnected:", error)
         update_runtime_state(connected=False)
 
+        try:
+            arduino.close()
+        except Exception:
+            pass
+
+        arduino = None
         return False
 
 
@@ -121,11 +150,14 @@ def read_arduino_messages():
 
     global current_temperature
     global last_temperature_time
+    global arduino
+
+    if not try_connect_arduino():
+        update_runtime_state(connected=False)
+        return
 
     try:
-
         while arduino.in_waiting > 0:
-
             message = (
                 arduino.readline()
                 .decode(errors="ignore")
@@ -135,19 +167,9 @@ def read_arduino_messages():
             if not message:
                 continue
 
-
-            # ---------------------------------------------
-            # TEMPERATURE
-            # ---------------------------------------------
-
             if message.startswith("TEMP:"):
-
                 try:
-
-                    value = float(
-                        message.replace("TEMP:", "")
-                    )
-
+                    value = float(message.replace("TEMP:", ""))
                     current_temperature = value
                     last_temperature_time = time.time()
 
@@ -155,22 +177,23 @@ def read_arduino_messages():
                         website_status["temperature"] = value
                         website_status["temperature_valid"] = True
                         website_status["cooling_allowed"] = value > TEMPERATURE_THRESHOLD
-
                 except ValueError:
                     pass
-
-
             else:
-
                 print("Arduino:", message)
 
-        update_runtime_state(connected=arduino.is_open)
+        update_runtime_state(connected=arduino is not None and arduino.is_open)
 
-    except serial.SerialException as e:
-
-        print("Serial read error:", e)
-
+    except (serial.SerialException, OSError) as error:
+        print("Serial read error — Arduino USB may be disconnected:", error)
         update_runtime_state(connected=False)
+
+        try:
+            arduino.close()
+        except Exception:
+            pass
+
+        arduino = None
 
 # =========================================================
 # TEMPERATURE CONDITION
@@ -267,6 +290,7 @@ def load_ai():
 
 model = None
 cap = None
+show_preview = True
 
 ai_active = False
 
@@ -300,7 +324,7 @@ runtime_started_at = {
     "zone2_light": None,
 }
 website_status = {
-    "connected": True,
+    "connected": False,
     "ai_active": False,
     "zone1": False,
     "zone2": False,
@@ -566,7 +590,6 @@ model = load_ai()
 
 if cap is None:
 
-    arduino.close()
     update_runtime_state(connected=False)
 
     raise SystemExit
@@ -609,6 +632,8 @@ try:
 
         if ai_active:
 
+            # Reconnect automatically if the USB cable was removed and later restored.
+            try_connect_arduino()
 
             # ---------------------------------------------
             # READ ARDUINO DATA
@@ -1215,27 +1240,38 @@ try:
 
 
             # =================================================
-            # SHOW CAMERA
+            # CAMERA PREVIEW
             # =================================================
 
-            cv2.imshow(
-                "VisionSense",
-                frame
-            )
+            if show_preview:
+                try:
+                    cv2.imshow(
+                        "VisionSense",
+                        frame
+                    )
 
+                    # If the user clicks the camera window's X, hide only
+                    # the preview. AI/YOLO and classroom control continue.
+                    if cv2.getWindowProperty("VisionSense", cv2.WND_PROP_VISIBLE) < 1:
+                        print("Camera preview closed — AI continues in background.")
+                        show_preview = False
+                        cv2.destroyWindow("VisionSense")
 
-            # =================================================
-            # Q = COMPLETE STOP
-            # =================================================
+                    else:
+                        key = cv2.waitKey(1) & 0xFF
 
-            key = cv2.waitKey(1) & 0xFF
+                        if key == ord("q") or key == 27:
+                            print("Q pressed — complete system stop.")
+                            break
 
+                except cv2.error:
+                    print("Camera preview closed — AI continues in background.")
+                    show_preview = False
 
-            if key == ord("q") or key == 27:
-
-                print("Q pressed.")
-
-                break
+            else:
+                # No OpenCV window is required while AI runs in the background.
+                # Keep a tiny wait so the loop remains responsive.
+                time.sleep(0.001)
 
 
         # =================================================
@@ -1246,7 +1282,12 @@ try:
 
             try:
 
-                # Check Arduino for WAKE
+                try_connect_arduino()
+
+                # Check Arduino for WAKE only when Arduino is connected.
+                if arduino is None or not arduino.is_open:
+                    time.sleep(0.05)
+                    continue
 
                 while arduino.in_waiting > 0:
 
@@ -1277,6 +1318,7 @@ try:
 
                         # Open the camera first so the window appears immediately.
                         cap = open_camera()
+                        show_preview = True
 
 
                         # ---------------------------------
@@ -1424,12 +1466,10 @@ finally:
     # Close Arduino
 
     try:
-
-        arduino.close()
+        if arduino is not None:
+            arduino.close()
         update_runtime_state(connected=False)
-
-    except:
-
+    except Exception:
         update_runtime_state(connected=False)
 
 
