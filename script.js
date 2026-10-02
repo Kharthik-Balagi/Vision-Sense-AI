@@ -393,7 +393,7 @@ let latestMeasurement = null;
 
 async function refreshLiveStatus() {
   try {
-    const status = await fetchCurrentStatus(); latestLiveStatus = status; if (measurementState.running) { latestMeasurement = updateAutomaticMeasurement(status); } else if (measurementState.initialized) { latestMeasurement = getMeasurementSnapshot(status); } updateTemperatureStatus(status);
+    const status = await fetchCurrentStatus(); latestLiveStatus = status; updateEnergyRuntime(status); if (measurementState.running) { latestMeasurement = updateAutomaticMeasurement(status); } else if (measurementState.initialized) { latestMeasurement = getMeasurementSnapshot(status); } updateTemperatureStatus(status);
   } catch {
     latestLiveStatus = null; updateTemperatureStatus({temperature_valid:false, temperature:null, cooling_allowed:false});
   } finally {
@@ -598,3 +598,170 @@ if ("serviceWorker" in navigator) {
       });
   });
 }
+
+
+
+/* Energy impact calculator: measured prototype runtime -> classroom/school projection */
+const energyForm = document.getElementById("energy-calculator-form");
+const energyValidation = document.getElementById("energy-validation");
+const energyRuntimeSource = document.getElementById("energy-runtime-source");
+
+const energyRuntimeFields = {
+  zone1_fan: document.getElementById("calc-z1-fan"),
+  zone1_light: document.getElementById("calc-z1-light"),
+  zone2_fan: document.getElementById("calc-z2-fan"),
+  zone2_light: document.getElementById("calc-z2-light"),
+};
+
+const energyInputs = {
+  fanWatts: document.getElementById("energy-fan-watts"),
+  lightWatts: document.getElementById("energy-light-watts"),
+  fansPerZone: document.getElementById("energy-fans-per-zone"),
+  lightsPerZone: document.getElementById("energy-lights-per-zone"),
+  hours: document.getElementById("energy-hours"),
+  days: document.getElementById("energy-days"),
+  classrooms: document.getElementById("energy-classrooms"),
+  tariff: document.getElementById("energy-tariff"),
+};
+
+let latestEnergyRuntime = {
+  zone1_fan_runtime: 0,
+  zone1_light_runtime: 0,
+  zone2_fan_runtime: 0,
+  zone2_light_runtime: 0,
+};
+
+function formatEnergyRuntime(seconds) {
+  const safe = Math.max(0, Math.floor(Number(seconds) || 0));
+  const hours = Math.floor(safe / 3600);
+  const minutes = Math.floor((safe % 3600) / 60);
+  const remaining = safe % 60;
+  return [hours, minutes, remaining].map((value) => String(value).padStart(2, "0")).join(":");
+}
+
+function updateEnergyRuntime(status) {
+  if (!status) return;
+  const fields = [
+    "zone1_fan_runtime",
+    "zone1_light_runtime",
+    "zone2_fan_runtime",
+    "zone2_light_runtime",
+  ];
+
+  fields.forEach((field) => {
+    if (Number.isFinite(status[field]) && status[field] >= 0) {
+      latestEnergyRuntime[field] = status[field];
+      const element = energyRuntimeFields[field];
+      if (element) element.textContent = formatEnergyRuntime(status[field]);
+    }
+  });
+
+  const measuredTotal = fields.reduce((sum, field) => sum + latestEnergyRuntime[field], 0);
+  if (energyRuntimeSource) {
+    energyRuntimeSource.textContent = measuredTotal > 0
+      ? "Live measured prototype runtime"
+      : "No measured runtime yet";
+  }
+}
+
+function readPositiveInput(input, label, allowZero = false) {
+  const value = Number(input?.value);
+  const minimum = allowZero ? 0 : Number.EPSILON;
+  if (!Number.isFinite(value) || value < minimum) {
+    throw new Error(`${label} must be ${allowZero ? "zero or greater" : "greater than zero"}.`);
+  }
+  return value;
+}
+
+function formatKwh(value) {
+  if (!Number.isFinite(value)) return "—";
+  return value < 10 ? value.toFixed(3) : value.toFixed(2);
+}
+
+function formatMoney(value) {
+  if (!Number.isFinite(value)) return "—";
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+function calculateEnergyImpact() {
+  const fanWatts = readPositiveInput(energyInputs.fanWatts, "Fan power");
+  const lightWatts = readPositiveInput(energyInputs.lightWatts, "Light power");
+  const fansPerZone = readPositiveInput(energyInputs.fansPerZone, "Fans per zone", true);
+  const lightsPerZone = readPositiveInput(energyInputs.lightsPerZone, "Lights per zone", true);
+  const hours = readPositiveInput(energyInputs.hours, "Classroom hours");
+  const days = readPositiveInput(energyInputs.days, "School days");
+  const classrooms = readPositiveInput(energyInputs.classrooms, "Classrooms");
+  const tariff = readPositiveInput(energyInputs.tariff, "Electricity tariff", true);
+
+  const zoneCount = 2;
+
+  const conventionalWhPerDay =
+    ((fanWatts * fansPerZone) + (lightWatts * lightsPerZone)) * zoneCount * hours;
+
+  const smartFanWhPerDay =
+    fanWatts * fansPerZone *
+    ((latestEnergyRuntime.zone1_fan_runtime + latestEnergyRuntime.zone2_fan_runtime) / 3600);
+
+  const smartLightWhPerDay =
+    lightWatts * lightsPerZone *
+    ((latestEnergyRuntime.zone1_light_runtime + latestEnergyRuntime.zone2_light_runtime) / 3600);
+
+  const smartWhPerMeasuredRun = smartFanWhPerDay + smartLightWhPerDay;
+
+  if (smartWhPerMeasuredRun <= 0) {
+    throw new Error("No Vision Sense AI runtime has been measured yet. Start the system and record a representative run first.");
+  }
+
+  const measuredRunHours = Math.max(
+    latestEnergyRuntime.zone1_fan_runtime,
+    latestEnergyRuntime.zone1_light_runtime,
+    latestEnergyRuntime.zone2_fan_runtime,
+    latestEnergyRuntime.zone2_light_runtime,
+  ) / 3600;
+
+  if (measuredRunHours <= 0) {
+    throw new Error("The measured runtime is zero. Run the prototype before calculating.");
+  }
+
+  /*
+   * The prototype may be observed for a period shorter than the classroom schedule.
+   * Convert the measured smart device energy into a daily value using the measured
+   * device runtime pattern, but do not let the scaled smart result exceed the
+   * conventional baseline for the same classroom.
+   */
+  const smartDailyKwh = Math.min(smartWhPerMeasuredRun / 1000, conventionalWhPerDay / 1000);
+  const conventionalDailyKwh = conventionalWhPerDay / 1000;
+  const savedDailyKwh = Math.max(0, conventionalDailyKwh - smartDailyKwh);
+  const savingPercent = conventionalDailyKwh > 0
+    ? (savedDailyKwh / conventionalDailyKwh) * 100
+    : 0;
+
+  const annualSavedKwh = savedDailyKwh * days * 12 * classrooms;
+  const annualCostSaved = annualSavedKwh * tariff;
+
+  document.getElementById("energy-conventional").textContent = formatKwh(conventionalDailyKwh);
+  document.getElementById("energy-smart").textContent = formatKwh(smartDailyKwh);
+  document.getElementById("energy-saved").textContent = `${formatKwh(savedDailyKwh)} kWh`;
+  document.getElementById("energy-saved-period").textContent = `${formatKwh(savedDailyKwh)} kWh saved per classroom per school day`;
+  document.getElementById("energy-percent").textContent = `${savingPercent.toFixed(1)}%`;
+  document.getElementById("energy-annual").textContent = formatKwh(annualSavedKwh);
+  document.getElementById("energy-cost").textContent = formatMoney(annualCostSaved);
+  document.getElementById("energy-scale").textContent = String(Math.round(classrooms));
+
+  return { conventionalDailyKwh, smartDailyKwh, savedDailyKwh, savingPercent, annualSavedKwh, annualCostSaved };
+}
+
+energyForm?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (energyValidation) energyValidation.textContent = "";
+
+  try {
+    calculateEnergyImpact();
+  } catch (error) {
+    if (energyValidation) energyValidation.textContent = error instanceof Error ? error.message : "Please check the calculator inputs.";
+  }
+});
