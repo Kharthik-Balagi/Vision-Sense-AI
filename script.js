@@ -182,6 +182,13 @@ async function controlVisionSense(action) {
       throw new Error(result.message || "Local controller rejected the request.");
     }
 
+    if (isStarting) {
+      startMeasurementSession(latestLiveStatus);
+    } else {
+      stopMeasurementSession(latestLiveStatus);
+      if (latestLiveStatus) renderAutomaticMeasurement(latestLiveStatus, latestMeasurement);
+    }
+
     systemControlStatus.innerHTML = '<span class="pulse-dot"></span> ' + (
       isStarting
         ? "Vision Sense AI starting — camera and YOLO will appear on the laptop."
@@ -288,8 +295,14 @@ async function refreshLiveStatus() {
     }
 
     latestLiveStatus = status;
-    latestMeasurement = updateAutomaticMeasurement(status);
-    renderAutomaticMeasurement(status, latestMeasurement);
+    if (measurementState.running) {
+      latestMeasurement = updateAutomaticMeasurement(status);
+    } else if (measurementState.initialized) {
+      latestMeasurement = getMeasurementSnapshot(status);
+    }
+    if (latestMeasurement) {
+      renderAutomaticMeasurement(status, latestMeasurement);
+    }
     updateSystemConnection(status.connected);
     updateTemperatureStatus(status);
   } catch {
@@ -445,9 +458,10 @@ const measurementStorageKey = "visionSensePrototypeMeasurementV2";
 let measurementState = {
   activeSeconds: 0,
   inactiveSeconds: 0,
-  lastTimestamp: Date.now(),
+  lastTimestamp: 0,
   lastAiActive: false,
   initialized: false,
+  running: false,
   runtimeBaseline: null,
 };
 
@@ -460,35 +474,56 @@ function saveMeasurementState() {
 }
 
 function loadMeasurementState() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(measurementStorageKey) || "null");
-    if (saved && Number.isFinite(saved.activeSeconds) && Number.isFinite(saved.inactiveSeconds)
-      && Number.isFinite(saved.lastTimestamp) && typeof saved.lastAiActive === "boolean") {
-      measurementState = {
-        activeSeconds: Math.max(0, saved.activeSeconds),
-        inactiveSeconds: Math.max(0, saved.inactiveSeconds),
-        lastTimestamp: saved.lastTimestamp,
-        lastAiActive: saved.lastAiActive,
-        initialized: true,
-        runtimeBaseline: null,
-      };
-    }
-  } catch {
-    measurementState.initialized = false;
-  }
+  // A measurement session must never start just because the page was opened.
+  // Only the START SYSTEM control can create a fresh session.
+  measurementState = {
+    activeSeconds: 0,
+    inactiveSeconds: 0,
+    lastTimestamp: 0,
+    lastAiActive: false,
+    initialized: false,
+    running: false,
+    runtimeBaseline: null,
+  };
+}
+
+function startMeasurementSession(status = null) {
+  measurementState = {
+    activeSeconds: 0,
+    inactiveSeconds: 0,
+    lastTimestamp: Date.now(),
+    lastAiActive: status?.ai_active === true,
+    initialized: false,
+    running: true,
+    runtimeBaseline: status ? {
+      zone1_fan: Number(status.zone1_fan_runtime) || 0,
+      zone2_fan: Number(status.zone2_fan_runtime) || 0,
+      zone1_light: Number(status.zone1_light_runtime) || 0,
+      zone2_light: Number(status.zone2_light_runtime) || 0,
+    } : null,
+  };
+  latestMeasurement = null;
+}
+
+function stopMeasurementSession(status = null) {
+  if (!measurementState.running) return;
+  if (status) updateAutomaticMeasurement(status);
+  measurementState.running = false;
+  latestMeasurement = getMeasurementSnapshot(status || latestLiveStatus);
+  saveMeasurementState();
 }
 
 function updateAutomaticMeasurement(status) {
+  if (!measurementState.running) return getMeasurementSnapshot(status);
+
   const now = Date.now();
 
-  // Device runtimes are cumulative, so establish a baseline when this browser
-  // measurement session begins. Historical runtime must not affect this test.
   if (!measurementState.runtimeBaseline) {
     measurementState.runtimeBaseline = {
-      zone1_fan: status.zone1_fan_runtime,
-      zone2_fan: status.zone2_fan_runtime,
-      zone1_light: status.zone1_light_runtime,
-      zone2_light: status.zone2_light_runtime,
+      zone1_fan: Number(status.zone1_fan_runtime) || 0,
+      zone2_fan: Number(status.zone2_fan_runtime) || 0,
+      zone1_light: Number(status.zone1_light_runtime) || 0,
+      zone2_light: Number(status.zone2_light_runtime) || 0,
     };
   }
 
@@ -508,20 +543,29 @@ function updateAutomaticMeasurement(status) {
   }
 
   saveMeasurementState();
+  return getMeasurementSnapshot(status);
+}
 
+function getMeasurementSnapshot(status) {
+  const baseline = measurementState.runtimeBaseline || {
+    zone1_fan: Number(status?.zone1_fan_runtime) || 0,
+    zone2_fan: Number(status?.zone2_fan_runtime) || 0,
+    zone1_light: Number(status?.zone1_light_runtime) || 0,
+    zone2_light: Number(status?.zone2_light_runtime) || 0,
+  };
   return {
-    activeSeconds: measurementState.activeSeconds,
-    inactiveSeconds: measurementState.inactiveSeconds,
-    observationSeconds: measurementState.activeSeconds + measurementState.inactiveSeconds,
-    zone1FanSeconds: Math.max(0, status.zone1_fan_runtime - measurementState.runtimeBaseline.zone1_fan),
-    zone2FanSeconds: Math.max(0, status.zone2_fan_runtime - measurementState.runtimeBaseline.zone2_fan),
-    zone1LightSeconds: Math.max(0, status.zone1_light_runtime - measurementState.runtimeBaseline.zone1_light),
-    zone2LightSeconds: Math.max(0, status.zone2_light_runtime - measurementState.runtimeBaseline.zone2_light),
+    activeSeconds: Math.max(0, measurementState.activeSeconds),
+    inactiveSeconds: Math.max(0, measurementState.inactiveSeconds),
+    observationSeconds: Math.max(0, measurementState.activeSeconds + measurementState.inactiveSeconds),
+    zone1FanSeconds: Math.max(0, (Number(status?.zone1_fan_runtime) || 0) - baseline.zone1_fan),
+    zone2FanSeconds: Math.max(0, (Number(status?.zone2_fan_runtime) || 0) - baseline.zone2_fan),
+    zone1LightSeconds: Math.max(0, (Number(status?.zone1_light_runtime) || 0) - baseline.zone1_light),
+    zone2LightSeconds: Math.max(0, (Number(status?.zone2_light_runtime) || 0) - baseline.zone2_light),
   };
 }
 
 function renderAutomaticMeasurement(status, measurement) {
-  const runtimeValues = {
+  showMeasurementReadings({
     active: measurement.activeSeconds,
     inactive: measurement.inactiveSeconds,
     observation: measurement.observationSeconds,
@@ -529,30 +573,22 @@ function renderAutomaticMeasurement(status, measurement) {
     zone2Fan: measurement.zone2FanSeconds,
     zone1Light: measurement.zone1LightSeconds,
     zone2Light: measurement.zone2LightSeconds,
-    fanUtilization: measurement.activeSeconds > 0
-      ? Math.min(1, (measurement.zone1FanSeconds + measurement.zone2FanSeconds) / (2 * measurement.activeSeconds))
-      : 0,
-    lightUtilization: measurement.activeSeconds > 0
-      ? Math.min(1, (measurement.zone1LightSeconds + measurement.zone2LightSeconds) / (2 * measurement.activeSeconds))
-      : 0,
-  };
+  });
 
-  showMeasurementReadings(runtimeValues);
-  const systemState = status.ai_active === true ? "Camera / AI active" : "Camera / AI off";
+  const systemState = measurementState.running
+    ? (status.ai_active === true ? "Camera / AI active" : "Camera / AI off")
+    : "Measurement stopped";
   document.getElementById("measurement-status").textContent =
     `${systemState} · Active ${formatRuntime(measurement.activeSeconds)} · Camera off ${formatRuntime(measurement.inactiveSeconds)}`;
   liveMeasurementSummary.textContent =
     `Active ${formatRuntime(measurement.activeSeconds)} · Camera off ${formatRuntime(measurement.inactiveSeconds)} · Total ${formatRuntime(measurement.observationSeconds)}`;
 
-  updatePrototypeResults({
-    fan: runtimeValues.fanUtilization,
-    light: runtimeValues.lightUtilization,
-    measuredFanHours: (measurement.zone1FanSeconds + measurement.zone2FanSeconds) / 2 / 3600,
-    measuredLightHours: (measurement.zone1LightSeconds + measurement.zone2LightSeconds) / 2 / 3600,
-    activeHours: measurement.activeSeconds / 3600,
-    observationHours: measurement.observationSeconds / 3600,
-  }, getSelectedPower(fanTypeInput, fanOptions, customFanPowerInput),
-     getSelectedPower(lightTypeInput, lightOptions, customLightPowerInput));
+  updatePrototypeResults(
+    measurement,
+    getSelectedPower(fanTypeInput, fanOptions, customFanPowerInput),
+    getSelectedPower(lightTypeInput, lightOptions, customLightPowerInput),
+    Number(document.querySelector("#vision-sense-ai-power")?.value)
+  );
 }
 
 function getSelectedPower(typeSelect, options, customInput) {
@@ -563,22 +599,38 @@ function getSelectedPower(typeSelect, options, customInput) {
   return options[typeSelect.value]?.watts ?? null;
 }
 
-function updatePrototypeResults(utilization, fanPower, lightPower) {
+function updatePrototypeResults(measurement, fanPower, lightPower, aiPower) {
   const basisElement = document.querySelector("#prototype-measured-basis");
-  if (!Number.isFinite(fanPower) || !Number.isFinite(lightPower)) {
-    document.querySelector("#prototype-conventional-energy").innerHTML = "— <small>kWh</small>";
-    document.querySelector("#prototype-smart-energy").innerHTML = "— <small>kWh</small>";
-    document.querySelector("#prototype-energy-saved").innerHTML = "— <small>kWh</small>";
-    document.querySelector("#prototype-saving-percent").textContent = "Select valid equipment ratings";
-    basisElement.textContent = "Waiting for valid fan and light ratings";
+  if (!Number.isFinite(fanPower) || !Number.isFinite(lightPower) || !Number.isFinite(aiPower) || aiPower < 0) {
+    document.querySelector("#prototype-conventional-energy").innerHTML = "— <small>kWh/day</small>";
+    document.querySelector("#prototype-smart-energy").innerHTML = "— <small>kWh/day</small>";
+    document.querySelector("#prototype-energy-saved").innerHTML = "— <small>kWh/day</small>";
+    document.querySelector("#prototype-saving-percent").textContent = "Enter valid equipment + AI power";
+    basisElement.textContent = "Waiting for valid power ratings and a fresh measurement session";
     return;
   }
 
-  // Conventional comparison is a full classroom operating day.
-  // Smart energy is based only on device runtime measured in this fresh session.
-  const conventionalOperatingHours = 7;
-  const conventional = (fanPower * conventionalOperatingHours + lightPower * conventionalOperatingHours) / 1000;
-  const smart = (fanPower * utilization.measuredFanHours + lightPower * utilization.measuredLightHours) / 1000;
+  const observationHours = measurement.observationSeconds / 3600;
+  const activeHours = measurement.activeSeconds / 3600;
+  const measuredFanHours = (measurement.zone1FanSeconds + measurement.zone2FanSeconds) / 2 / 3600;
+  const measuredLightHours = (measurement.zone1LightSeconds + measurement.zone2LightSeconds) / 2 / 3600;
+
+  // Conventional: both identical fans/lights are assumed to run for the entire
+  // measured camera-on + camera-off observation period, then scaled to 7 hours.
+  const conventionalFanMeasured = observationHours * fanPower;
+  const conventionalLightMeasured = observationHours * lightPower;
+  const conventionalFan7h = conventionalFanMeasured * (7 / Math.max(observationHours, 1 / 3600));
+  const conventionalLight7h = conventionalLightMeasured * (7 / Math.max(observationHours, 1 / 3600));
+  const conventional = (conventionalFan7h + conventionalLight7h) / 1000;
+
+  // Smart: average the two zone runtimes, then scale the measured device energy
+  // to the same 7-hour day. Add the Vision Sense AI system power for 7 hours.
+  const smartFanMeasured = measuredFanHours * fanPower;
+  const smartLightMeasured = measuredLightHours * lightPower;
+  const smartDeviceEnergy7h = (smartFanMeasured + smartLightMeasured) * (activeHours > 0 ? 7 / activeHours : 0) / 1000;
+  const smartAiEnergy7h = aiPower * 7 / 1000;
+  const smart = smartDeviceEnergy7h + smartAiEnergy7h;
+
   const saved = conventional - smart;
   const savingPercent = conventional > 0 ? (saved / conventional) * 100 : null;
 
@@ -587,9 +639,9 @@ function updatePrototypeResults(utilization, fanPower, lightPower) {
   document.querySelector("#prototype-energy-saved").innerHTML = formatEnergy(saved);
   document.querySelector("#prototype-saving-percent").textContent = savingPercent === null
     ? "—"
-    : `${savingPercent.toFixed(2)}% comparison`;
+    : `${savingPercent.toFixed(2)}% difference`;
   basisElement.textContent =
-    `Smart energy from this measurement session · Conventional energy assumes 7 h/day`;
+    `7 h/day · fan/light energy from fresh session · Vision Sense AI: ${aiPower.toFixed(1)} W`;
 }
 
 function readRequiredNumber(name, label, options = {}) {
@@ -672,6 +724,12 @@ energyForm.addEventListener("submit", (event) => {
 
   if (!latestMeasurement) {
     displayError("The measurement session has not started yet. Start the system and wait for live data.");
+    return;
+  }
+
+  const aiPower = Number(document.querySelector("#vision-sense-ai-power")?.value);
+  if (!Number.isFinite(aiPower) || aiPower < 0) {
+    displayError("Enter the total Vision Sense AI system power in watts.", document.querySelector("#vision-sense-ai-power"));
     return;
   }
 
