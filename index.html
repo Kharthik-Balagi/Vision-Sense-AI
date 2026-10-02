@@ -292,38 +292,5 @@
     <div class="section-shell footer-bottom"><span>Thoughtful energy use, one zone at a time.</span><span>FRONT-END PROJECT SIMULATION</span></div>
   </footer>
   </div>
-  <script>
-    (function () {
-      function setupSystemControls() {
-        const startButton = document.getElementById("start-system");
-        const stopButton = document.getElementById("stop-system");
-        const status = document.getElementById("system-control-status");
-        if (!startButton || !stopButton || !status || startButton.dataset.directControlReady === "true") return;
-        startButton.dataset.directControlReady = "true";
-        async function control(action) {
-          const starting = action === "start";
-          startButton.disabled = true;
-          stopButton.disabled = true;
-          status.innerHTML = '<span class="pulse-dot"></span> ' + (starting ? "Starting Vision Sense AI..." : "Stopping Vision Sense AI...");
-          try {
-            const response = await fetch("http://127.0.0.1:8766/" + action, { method: "POST", cache: "no-store" });
-            const result = await response.json();
-            if (!response.ok || result.ok !== true) throw new Error(result.message || "Controller rejected the request.");
-            status.innerHTML = '<span class="pulse-dot"></span> ' + (starting ? "Vision Sense AI starting — camera and YOLO will appear on the laptop." : "Vision Sense AI stopped safely.");
-            startButton.disabled = starting;
-            stopButton.disabled = !starting;
-          } catch (error) {
-            status.innerHTML = '<span class="pulse-dot"></span> Local controller not running. Start vision_sense_launcher.py on this laptop.';
-            startButton.disabled = false;
-            stopButton.disabled = true;
-          }
-        }
-        startButton.addEventListener("click", function (event) { event.preventDefault(); control("start"); });
-        stopButton.addEventListener("click", function (event) { event.preventDefault(); control("stop"); });
-      }
-      if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", setupSystemControls, { once: true });
-      else setupSystemControls();
-    })();
-  </script>
 </body>
 </html>
