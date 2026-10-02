@@ -45,8 +45,11 @@
         <h1>Smart Classroom<br><span>Energy Conservation</span><br>System</h1>
         <p class="hero-subtitle">Zone-based automation for smarter and more efficient classroom energy use.</p>
         <div class="hero-actions">
-          <a class="button button-primary" href="#calculator">Explore the Project <span aria-hidden="true">↓</span></a>
-          <span class="hero-caption"><span class="pulse-dot"></span> A smarter way to power every space</span>
+          <div class="system-control-buttons" aria-label="Vision Sense AI controls">
+            <button class="button button-primary system-control-button" id="start-system" type="button">START SYSTEM <span aria-hidden="true">▶</span></button>
+            <button class="button button-secondary system-control-button" id="stop-system" type="button" disabled>STOP SYSTEM <span aria-hidden="true">■</span></button>
+          </div>
+          <span class="hero-caption" id="system-control-status" aria-live="polite"><span class="pulse-dot"></span> System ready — press Start to begin</span>
         </div>
         <div class="hero-stats" aria-label="Project overview">
           <div><strong>02</strong><span>Classroom zones</span></div>
