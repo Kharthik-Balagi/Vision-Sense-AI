@@ -223,11 +223,69 @@ function resetRuntimeDisplay() {
   }
 }
 
+function resetEnergyCalculatorDisplay() {
+  const blankEnergyIds = [
+    "prototype-conventional-energy",
+    "prototype-smart-energy",
+    "prototype-energy-saved",
+    "conventional-fan-energy",
+    "conventional-light-energy",
+    "conventional-daily",
+    "smart-fan-energy",
+    "smart-light-energy",
+    "smart-daily",
+    "daily-difference",
+    "monthly-difference",
+  ];
+
+  for (const id of blankEnergyIds) {
+    const element = document.getElementById(id);
+    if (element) element.innerHTML = "— <small>kWh</small>";
+  }
+
+  const prototypePercent = document.getElementById("prototype-saving-percent");
+  if (prototypePercent) prototypePercent.textContent = "Waiting for a fresh measurement session";
+
+  const energyPercent = document.getElementById("energy-saving-percent");
+  if (energyPercent) energyPercent.textContent = "— % net energy difference";
+
+  const monthlyCost = document.getElementById("monthly-cost");
+  if (monthlyCost) monthlyCost.textContent = "—";
+
+  const smartFanTime = document.getElementById("smart-fan-time");
+  if (smartFanTime) smartFanTime.textContent = "Projected run time: -- h/device/day";
+
+  const smartLightTime = document.getElementById("smart-light-time");
+  if (smartLightTime) smartLightTime.textContent = "Projected run time: -- h/device/day";
+
+  // The fixed project contribution is intentionally unchanged:
+  // Vision Sense AI = 30 W and 0.21 kWh/day.
+  const smartAiEnergy = document.getElementById("smart-ai-energy");
+  if (smartAiEnergy) smartAiEnergy.innerHTML = formatEnergy(0.21);
+
+  const smartAiTime = document.getElementById("smart-ai-time");
+  if (smartAiTime) smartAiTime.textContent = "AI system power: 30.0 W × 7.00 h/day";
+
+  latestMeasurement = null;
+  measurementState = {
+    activeSeconds: 0,
+    inactiveSeconds: 0,
+    lastTimestamp: 0,
+    lastAiActive: false,
+    initialized: false,
+    running: false,
+    liveStarted: false,
+    runtimeBaseline: null,
+  };
+  saveMeasurementState();
+}
+
 function requestWebsiteCloseShutdown() {
   if (websiteCloseHandled) return;
   websiteCloseHandled = true;
 
   resetRuntimeDisplay();
+  resetEnergyCalculatorDisplay();
 
   const url = "http://127.0.0.1:8765/shutdown_and_reset";
   const payload = new Blob(["website-close"], { type: "text/plain" });
