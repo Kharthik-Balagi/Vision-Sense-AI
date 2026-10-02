@@ -565,8 +565,11 @@ let measurementState = {
   inactiveSeconds: 0,
   lastTimestamp: 0,
   lastAiActive: false,
+  lastPersonDetected: false,
+  lastCameraOff: false,
   initialized: false,
   running: false,
+  liveStarted: false,
   runtimeBaseline: null,
 };
 
