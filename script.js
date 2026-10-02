@@ -721,12 +721,16 @@ function updatePrototypeResults(measurement, fanPower, lightPower, aiPower) {
   const measuredFanHours = (measurement.zone1FanSeconds + measurement.zone2FanSeconds) / 2 / 3600;
   const measuredLightHours = (measurement.zone1LightSeconds + measurement.zone2LightSeconds) / 2 / 3600;
 
-  // Conventional: both identical fans/lights are assumed to run for the entire
-  // measured camera-on + camera-off observation period, then scaled to 7 hours.
-  const conventionalFanMeasured = observationHours * fanPower;
-  const conventionalLightMeasured = observationHours * lightPower;
-  const conventionalFan7h = conventionalFanMeasured * (7 / Math.max(observationHours, 1 / 3600));
-  const conventionalLight7h = conventionalLightMeasured * (7 / Math.max(observationHours, 1 / 3600));
+  // Conventional: without Vision Sense AI, both zone fans and both zone lights
+  // would run throughout the whole measured period. Add 1 minute for the
+  // student's possible delay in switching the system off after camera-off.
+  // Scale that conventional runtime from the measured observation to a 7-hour day.
+  const conventionalObservationSeconds = measurement.observationSeconds;
+  const conventionalRunSeconds = conventionalObservationSeconds + 60;
+  const conventionalRunHours = conventionalRunSeconds / 3600;
+  const conventionalScale = observationHours > 0 ? 7 / observationHours : 0;
+  const conventionalFan7h = 2 * conventionalRunHours * fanPower * conventionalScale;
+  const conventionalLight7h = 2 * conventionalRunHours * lightPower * conventionalScale;
   const conventional = (conventionalFan7h + conventionalLight7h) / 1000;
 
   // Smart: average the two zone runtimes, then scale the measured device energy
